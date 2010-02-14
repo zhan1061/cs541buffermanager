@@ -91,11 +91,14 @@ public class BufMgr{
 		}
 
 		if(!isBufferFull()){
+			// Find a frame.
+
 			// Try to allocate.
-
+			return null;
+		}else{
+			// Buffer full.
+			return null;
 		}
-
-		return null;
 	}
 
 	public void pinPage(PageId pinPgId, Page page, boolean emptyPage){
