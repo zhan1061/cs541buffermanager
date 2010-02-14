@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry excluding="tests/" kind="src" path="src"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry kind="lib" path="/home/anurag/Documents/Courses/CS541 - Databases/project2/proj21/lib/bufmgrAssign.jar"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>
