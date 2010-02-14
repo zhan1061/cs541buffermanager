@@ -6,6 +6,9 @@ import diskmgr.*;
 import global.*;
 import chainexception.*;
 
+/*
+ * Describes a frame.
+ */
 class FrameDescriptor{
 	PageId _pageNumber = null;
 	int _pinCount;
