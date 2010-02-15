@@ -13,7 +13,7 @@ class FrameDescriptor{
 	PageId _pageNumber = null;
 	int _pinCount;
 	boolean _bDirty;
-		
+	
 	public FrameDescriptor(){
 		// Initialize members
 		_pageNumber = new PageId();
@@ -59,14 +59,17 @@ public class BufMgr{
 	String _replacer = "clock";
 	byte[][] _pool = null;
 	FrameDescriptor[] _arrFrameDescriptor = null;
-	DB _db = null;
 	String _dbName = "singh47_db";
 	PageHashtable _pageHashtable = null;
+	int _numBufs = 0;
 
+	int _lastFrameAllotted = 0;
+	
 	public BufMgr(int numBufs, String replacer) throws ChainException{
 		_pool = new byte[numBufs][GlobalConst.MINIBASE_PAGESIZE];
 		_replacer = replacer;
-		_arrFrameDescriptor = new FrameDescriptor[numBufs];
+		_numBufs = numBufs;
+		_arrFrameDescriptor = new FrameDescriptor[_numBufs];
 
 		for(int frameDescriptorOffset = 0; frameDescriptorOffset < _arrFrameDescriptor.length; frameDescriptorOffset++){
 			_arrFrameDescriptor[frameDescriptorOffset] = new FrameDescriptor();
@@ -75,17 +78,27 @@ public class BufMgr{
 		_pageHashtable = new PageHashtable(Constants.PAGE_HASHTABLE_SIZE);
 		SystemDefs.JavabaseBM = this;
 		
-		_db = new DB();	
-		
-		try{
-			_db.openDB(_dbName, GlobalConst.MINIBASE_DB_SIZE);
-		}catch(Exception exception){
-			throw new ChainException(exception, "Exception occurred while opening " + _dbName);
-		}
-		
-		
+//		try{
+//			_db.openDB(_dbName, GlobalConst.MINIBASE_DB_SIZE);
+//		}catch(Exception exception){
+//			throw new ChainException(exception, "Exception occurred while opening " + _dbName);
+//		}		
 	}
 
+	/**
+	 * Allocate new pages.
+	 * Call DB object to allocate a run of new pages and
+	 * find a frame in the buffer pool for the first page
+	 * and pin it. (This call allows a client of the Buffer Manager
+	 * to allocate pages on disk.) If buffer is full, i.e., you
+	 * can't find a frame for the first page, ask DB to deallocate
+	 * all these pages, and return null.
+	 *
+	 * @param firstpage the address of the first page.
+	 * @param howmany total number of allocated new pages.
+	 *
+	 * @return the first page id of the new pages.  null, if error.
+	 */
 	public PageId newPage(Page firstPage, int howmany) throws ChainException{
 		if(howmany <= 0){
 			// Invalid parameters.
@@ -97,16 +110,20 @@ public class BufMgr{
 		}
 
 		if(!isBufferFull()){
+			// Buffer not full.
 			PageId firstPageId = new PageId();
 			
 			// Try to allocate a page on disk.
 			try{
-				_db.allocate_page(firstPageId, howmany);
+				(SystemDefs.JavabaseDB).allocate_page(firstPageId, howmany);
 			}catch(Exception exception){
 				throw new ChainException(exception, "Unable to allocate " + howmany + " pages.");
 			}
 			
-			// Page allocated.			
+			// Page allocated.
+			// Pin the first page.
+			pinPage(firstPageId, firstPage, false);			
+			
 			return firstPageId;
 		}else{
 			// Buffer full.
@@ -134,11 +151,14 @@ public class BufMgr{
 			page.setpage(_pool[frameToUse]);
 		}else{
 			// Page not in pool.
-			frameToUse = 20;
-			// TODO: Get replacement frame's number.
+			frameToUse = _lastFrameAllotted++;
+			
+			// TODO: Get replacement frame's number. If no replacement
+			// frame is available, throw an exception. If one is, reflect the
+			// mapping in the hashtable.
 			
 			if(_arrFrameDescriptor[frameToUse]._bDirty){
-				// TODO: Flush
+				flushPage(pinPgId);
 			}
 			
 			// Assign frameToUse to pinPgId in the hashtable
@@ -149,7 +169,7 @@ public class BufMgr{
 			
 			// Read page into disk.
 			try{
-				_db.read_page(pinPgId, page);
+				(SystemDefs.JavabaseDB).read_page(pinPgId, page);
 			}catch(Exception exception){
 				throw new ChainException(exception, "Unable to read page.");
 			}
@@ -162,8 +182,53 @@ public class BufMgr{
 			
 	}
 
-	public void unpinPage(PageId PageId_in_a_DB, boolean dirty) {};
+	public void unpinPage(PageId PageId_in_a_DB, boolean dirty) throws ChainException{
+	
+	}
 
+	/**
+	 * Used to flush a particular page of the buffer pool to disk.
+	 * This method calls the write_page method of the diskmgr package.
+	 *
+	 * @param pageid the page number in the database.
+	 */
+	public void flushPage(PageId pageid) throws ChainException{
+		if(pageid == null){
+			throw new InvalidPageAddressException(null, "Invalid page address specified.");
+		}
+		
+		// Check if there exists a frame for this page.
+		int frameForPage;
+		
+		if((frameForPage = _pageHashtable.getPageFrame(pageid.pid)) != Constants.NO_FRAME_FOUND){
+			// We have a valid frame to flush to disk.
+			Page pageToWrite = new Page();
+			pageToWrite.setpage(_pool[frameForPage]);
+			
+			// Write frame to disk.
+			try{
+				(SystemDefs.JavabaseDB).write_page(pageid, pageToWrite);
+			}catch(Exception exception){
+				throw new ChainException(exception, "Unable to write frame to disk.");
+			}
+		}else{
+			throw new PageNotInPoolException(null, "Page " + pageid.pid + " not in pool.");
+		}
+	}
+	
+	/** Flushes all pages of the buffer pool to disk
+	 */
+	public void flushAllPages() throws ChainException{
+		ArrayList lstPages = _pageHashtable.getAllPages();
+		
+		for(int lstPagesOffset = 0; lstPagesOffset < lstPages.size(); lstPagesOffset++){
+			PageId pageId = new PageId();
+			pageId.pid = (Integer)lstPages.get(lstPagesOffset);
+			
+			flushPage(pageId);
+		}
+	}
+	
 	/*
 	 * Returns true if all frames have non-zero pin counts.
 	 */
@@ -178,5 +243,49 @@ public class BufMgr{
 	
 		// All frames have non-zero pin-counts. Buffer is full.
 		return true;
+	}
+	
+	/**
+	 * This method should be called to delete a page that is on disk.
+	 * This routine must call the method in diskmgr package to
+	 * deallocate the page.
+	 *
+	 * @param globalPageId the page number in the data base.
+	 */
+
+	public void freePage(PageId globalPageId) throws ChainException{
+		// TODO
+	}
+	
+	/** Gets the total number of buffers.
+	 *
+	 * @return total number of buffer frames.
+	 */
+	public int getNumBuffers() {
+		return _numBufs;
+	}
+
+	/** Gets the total number of unpinned buffer frames.
+	 *
+	 * @return total number of unpinned buffer frames.
+	 */
+	public int getNumUnpinnedBuffers() {
+		int numUnpinnedBuffers = 0;
+		
+		for(int arrFrameDescriptorOffset = 0; arrFrameDescriptorOffset < _arrFrameDescriptor.length; 
+		arrFrameDescriptorOffset++){
+			if(_arrFrameDescriptor[arrFrameDescriptorOffset].getPinCount() == 0){
+				numUnpinnedBuffers++;
+			}
+		}
+		
+		return numUnpinnedBuffers;
+	}
+
+	/*
+	 * Print out the hashtable. To be used for debugging purposes.
+	 */
+	public void dumpHashTable(){
+		_pageHashtable.prettyPrint();
 	}
 }
