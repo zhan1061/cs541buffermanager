@@ -6,7 +6,11 @@ public class HashtableTester{
 
 		// Add stuff
 		for(int entry = 0; entry < 50; entry++){
-			pageHashTable.setPageFrame(entry, entry*2);
+			try{
+				pageHashTable.setPageFrame(entry, entry*2);
+			}catch(Exception exception){
+				// Do nothing.
+			}
 		}
 
 		// Retrieve stuff
