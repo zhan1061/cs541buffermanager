@@ -2,6 +2,10 @@ package bufmgr;
 
 import java.util.ArrayList;
 
+import chainexception.ChainException;
+
+import diskmgr.DuplicateEntryException;
+
 class PageFramePair{
 	int _page;
 	int _frame;
@@ -36,8 +40,6 @@ public class PageHashtable{
 		for(int pairListOffset = 0; pairListOffset < _arrPairList.length; pairListOffset++){
 			_arrPairList[pairListOffset] = new ArrayList();
 		}
-
-		System.out.println("Created table.");
 	}
 
 	/**
@@ -64,12 +66,12 @@ public class PageHashtable{
 		}
 	}
 
-	public void setPageFrame(int page, int frame){
+	public void setPageFrame(int page, int frame) throws ChainException{
 		// If the pair for page already exists, set the frame.
 		PageFramePair pageFramePair = getPairForPage(page);
 
 		if(pageFramePair != null){
-			pageFramePair.setFrame(frame);
+			throw new DuplicateEntryException(null, "Mapping for page " + page + " already exists.");
 		}else{
 			// Page's entry wasn't found. Create a new pair and add it to the appropriate list.
 			PageFramePair newPageFramePair = new PageFramePair(page, frame);
@@ -101,7 +103,39 @@ public class PageHashtable{
 			lstPair.remove(pageFramePair);
 		}
 	}
+	
+	/*
+	 * Returns a list of page numbers in the pool.
+	 */
+	public ArrayList getAllPages(){
+		ArrayList lstPages = new ArrayList();
+		
+		for(int pairListOffset = 0; pairListOffset < _arrPairList.length; pairListOffset++){
+			ArrayList lstPair = _arrPairList[pairListOffset];
+			
+			for(int lstPairOffset = 0; lstPairOffset < lstPair.size(); lstPairOffset++){
+				PageFramePair pageFramePair = (PageFramePair)lstPair.get(lstPairOffset);
+				
+				lstPages.add(new Integer(pageFramePair.getPage()));
+			}
+		}
+		
+		return lstPages;
+	}
 
+	public void prettyPrint(){
+		// Return a string representation of the hashtable.
+		for(int pairListOffset = 0; pairListOffset < _arrPairList.length; pairListOffset++){
+			ArrayList lstPair = _arrPairList[pairListOffset];
+			
+			for(int lstPairOffset = 0; lstPairOffset < lstPair.size(); lstPairOffset++){
+				PageFramePair pageFramePair = (PageFramePair)lstPair.get(lstPairOffset);
+				
+				System.out.println(pageFramePair.getPage() + " => " + pageFramePair.getFrame());
+			}
+		}
+	}
+	
 	private int hash(int value){
 		return (10 * value + 5) % (_tableSize);
 	}
