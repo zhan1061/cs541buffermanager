@@ -75,8 +75,15 @@ public class BufMgr{
 		_numBufs = numBufs;
 		_arrFrameDescriptor = new FrameDescriptor[_numBufs];
         
-		//creating obj of ClockReplace.java
-		replace = new ClockReplace();
+		if(_replacer == "clock")
+		{
+			replace = new ClockReplace();
+			for(int i = 0; i < numBufs; i++)
+				replace.addToList(new Integer(i));
+		}
+		else
+			throw new UnsupportedOperationException("Replacement Type not known.");
+
 		
 		for(int frameDescriptorOffset = 0; frameDescriptorOffset < _arrFrameDescriptor.length; frameDescriptorOffset++){
 			_arrFrameDescriptor[frameDescriptorOffset] = new FrameDescriptor();
@@ -317,8 +324,8 @@ public class BufMgr{
 			if(frameNum != Constants.NO_FRAME_FOUND){
 				_arrFrameDescriptor[frameNum] = new FrameDescriptor();
 				_pageHashtable.removeMappingForPage(globalPageId.pid);
-				replace.removeFromList(frameNum);
-				replace.addToList(frameNum);
+//				replace.removeFromList(frameNum);
+//				replace.addToList(frameNum);
 			}
 		} catch (IOException e) {
 			throw new BufException(null, "Error when trying to free page - IOException");
