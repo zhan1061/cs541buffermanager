@@ -85,11 +85,10 @@ public class BufMgr{
 		_pageHashtable = new PageHashtable(Constants.PAGE_HASHTABLE_SIZE);
 		SystemDefs.JavabaseBM = this;
 		
-//		try{
-//			_db.openDB(_dbName, GlobalConst.MINIBASE_DB_SIZE);
-//		}catch(Exception exception){
-//			throw new ChainException(exception, "Exception occurred while opening " + _dbName);
-//		}		
+		// Initialize replace queue by adding all frames to it.
+		for(int frameNumber = 0; frameNumber < _numBufs; frameNumber++){
+			replace.addToList(frameNumber);
+		}
 	}
 
 	/**
@@ -149,7 +148,8 @@ public class BufMgr{
 		if((frameToUse = _pageHashtable.getPageFrame(pinPgId.pid)) != Constants.NO_FRAME_FOUND){
 			// Page is in pool.
 			if(_arrFrameDescriptor[frameToUse].getPinCount() == 0){
-				// TODO: Remove page from queue.
+				// Remove page from replace-queue since it's no longer a replacement candidate.
+				replace.removeFromList(frameToUse);
 			}
 			
 			// Increment pin count
@@ -158,14 +158,21 @@ public class BufMgr{
 			page.setpage(_pool[frameToUse]);
 		}else{
 			// Page not in pool.
-			frameToUse = _lastFrameAllotted++;
-			
-			// TODO: Get replacement frame's number. If no replacement
-			// frame is available, throw an exception. If one is, reflect the
-			// mapping in the hashtable.
-			
-			if(_arrFrameDescriptor[frameToUse].isDirty()){
-				flushPage(pinPgId);
+			if((frameToUse = replace.getReplaceFrame()) == Constants.NO_FRAME_FOUND){
+				throw new BufferPoolExceededException(null, "No unpinned frames available.");
+			}else{
+				// Remove the old mapping from the hashtable, if it exists.
+				int pageToRemoveFromTable = _arrFrameDescriptor[frameToUse].getPage();
+				
+				if(pageToRemoveFromTable >= 0 & pageToRemoveFromTable < SystemDefs.JavabaseDB.db_num_pages()){
+					if(_arrFrameDescriptor[frameToUse].isDirty()){
+						PageId pageIdToRemove = new PageId();
+						pageIdToRemove.pid = pageToRemoveFromTable;
+						flushPage(pageIdToRemove);
+					}
+					
+					_pageHashtable.removeMappingForPage(pageToRemoveFromTable);
+				}
 			}
 			
 			// Assign frameToUse to pinPgId in the hashtable
@@ -185,26 +192,25 @@ public class BufMgr{
 			_arrFrameDescriptor[frameToUse].setPage(pinPgId.pid);
 			_arrFrameDescriptor[frameToUse].setPinCount(1);
 			_arrFrameDescriptor[frameToUse].setDirty(false);
-		}
-			
+		}			
 	}
-
 	
-	public void unpinPage(PageId upgid, boolean dirty)throws PagePinnedException, HashNotFoundException
+	public void unpinPage(PageId upgid, boolean dirty)throws PagePinnedException, HashEntryNotFoundException
 	    {
 	        int frameNum = _pageHashtable.getPageFrame(upgid.pid);
-	        if(frameNum == -1)
+	        if(frameNum == Constants.NO_FRAME_FOUND)
 	        {
-	        	throw new HashNotFoundException(null, "Page not in buffer");
+	        	throw new HashEntryNotFoundException(null, "Page not in buffer");
 	        }
 	        else
 	        {
 	            if(_arrFrameDescriptor[frameNum].getPinCount() == 0){
 	    			throw new PagePinnedException(null, "Pin count is already 0");
-
 	            }
+	            
 	            _arrFrameDescriptor[frameNum].setDirty(dirty);   
 	            _arrFrameDescriptor[frameNum].decrementPinCount();
+	            
 	            if(_arrFrameDescriptor[frameNum].getPinCount() == 0){
 	                //ClockReplace.java' s object is replace...
 	                replace.addToList(frameNum);
@@ -283,12 +289,21 @@ public class BufMgr{
 
 	public void freePage(PageId globalPageId)throws ChainException{
 		int frameNum = _pageHashtable.getPageFrame(globalPageId.pid);
-		if(frameNum != -1 && _arrFrameDescriptor[frameNum].getPinCount() > 0){
+		
+		if(frameNum != Constants.NO_FRAME_FOUND && _arrFrameDescriptor[frameNum].getPinCount() > 1){
 			throw new PagePinnedException(null, "Freeing page which is pinned");
 		}
-		Page page = new Page();
+		
 		try {
-			pinPage(globalPageId, page, true);
+			if(frameNum != Constants.NO_FRAME_FOUND){
+				if(_arrFrameDescriptor[frameNum].getPinCount() == 1){
+					// Unpin.
+					unpinPage(globalPageId, false);
+				}else{
+					// Do nothing.
+				}				
+			}
+			
 			try {
 				SystemDefs.JavabaseDB.deallocate_page(globalPageId);
 			} catch (InvalidRunSizeException e) {
@@ -298,15 +313,15 @@ public class BufMgr{
 			} catch (FileIOException e) {
 				throw new BufException(null, "Error when trying to free page - FileIOException");
 			}
-			unpinPage(globalPageId, false);
-			_arrFrameDescriptor[frameNum] = new FrameDescriptor();
-			_pageHashtable.removeMappingForPage(globalPageId.pid);
+			
+//			if(frameNum != Constants.NO_FRAME_FOUND){
+//				_arrFrameDescriptor[frameNum] = new FrameDescriptor();
+//				_pageHashtable.removeMappingForPage(globalPageId.pid);
+//			}
 		} catch (IOException e) {
 			throw new BufException(null, "Error when trying to free page - IOException");
 		}	
 	}
-	
-	
 	
 	/** Gets the total number of buffers.
 	 *
