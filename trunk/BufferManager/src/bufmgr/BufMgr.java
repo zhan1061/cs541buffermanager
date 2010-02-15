@@ -314,10 +314,12 @@ public class BufMgr{
 				throw new BufException(null, "Error when trying to free page - FileIOException");
 			}
 			
-//			if(frameNum != Constants.NO_FRAME_FOUND){
-//				_arrFrameDescriptor[frameNum] = new FrameDescriptor();
-//				_pageHashtable.removeMappingForPage(globalPageId.pid);
-//			}
+			if(frameNum != Constants.NO_FRAME_FOUND){
+				_arrFrameDescriptor[frameNum] = new FrameDescriptor();
+				_pageHashtable.removeMappingForPage(globalPageId.pid);
+				replace.removeFromList(frameNum);
+				replace.addToList(frameNum);
+			}
 		} catch (IOException e) {
 			throw new BufException(null, "Error when trying to free page - IOException");
 		}	
