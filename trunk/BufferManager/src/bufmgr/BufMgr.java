@@ -67,12 +67,17 @@ public class BufMgr{
 
 	int _lastFrameAllotted = 0;
 	
+	ClockReplace replace = null;
+	
 	public BufMgr(int numBufs, String replacer) throws ChainException{
 		_pool = new byte[numBufs][GlobalConst.MINIBASE_PAGESIZE];
 		_replacer = replacer;
 		_numBufs = numBufs;
 		_arrFrameDescriptor = new FrameDescriptor[_numBufs];
-
+        
+		//creating obj of ClockReplace.java
+		replace = new ClockReplace();
+		
 		for(int frameDescriptorOffset = 0; frameDescriptorOffset < _arrFrameDescriptor.length; frameDescriptorOffset++){
 			_arrFrameDescriptor[frameDescriptorOffset] = new FrameDescriptor();
 		}
@@ -184,10 +189,30 @@ public class BufMgr{
 			
 	}
 
-	public void unpinPage(PageId PageId_in_a_DB, boolean dirty) throws ChainException{
 	
-	}
+	public void unpinPage(PageId upgid, boolean dirty)throws PagePinnedException, HashNotFoundException
+	    {
+	        int frameNum = _pageHashtable.getPageFrame(upgid.pid);
+	        if(frameNum == -1)
+	        {
+	        	throw new HashNotFoundException(null, "Page not in buffer");
+	        }
+	        else
+	        {
+	            if(_arrFrameDescriptor[frameNum].getPinCount() == 0){
+	    			throw new PagePinnedException(null, "Pin count is already 0");
 
+	            }
+	            _arrFrameDescriptor[frameNum].setDirty(dirty);   
+	            _arrFrameDescriptor[frameNum].decrementPinCount();
+	            if(_arrFrameDescriptor[frameNum].getPinCount() == 0){
+	                //ClockReplace.java' s object is replace...
+	                replace.addToList(frameNum);
+	            }
+	        }
+	    }
+	
+	
 	/**
 	 * Used to flush a particular page of the buffer pool to disk.
 	 * This method calls the write_page method of the diskmgr package.
@@ -253,11 +278,35 @@ public class BufMgr{
 	 * deallocate the page.
 	 *
 	 * @param globalPageId the page number in the data base.
+	 * @throws ChainException 
 	 */
 
-	public void freePage(PageId globalPageId) throws ChainException{
-		// TODO
+	public void freePage(PageId globalPageId)throws ChainException{
+		int frameNum = _pageHashtable.getPageFrame(globalPageId.pid);
+		if(frameNum != -1 && _arrFrameDescriptor[frameNum].getPinCount() > 0){
+			throw new PagePinnedException(null, "Freeing page which is pinned");
+		}
+		Page page = new Page();
+		try {
+			pinPage(globalPageId, page, true);
+			try {
+				SystemDefs.JavabaseDB.deallocate_page(globalPageId);
+			} catch (InvalidRunSizeException e) {
+				throw new BufException(null, "Error when trying to free page - invalid run size");
+			} catch (InvalidPageNumberException e) {
+				throw new BufException(null, "Error when trying to free page - invalid page number");
+			} catch (FileIOException e) {
+				throw new BufException(null, "Error when trying to free page - FileIOException");
+			}
+			unpinPage(globalPageId, false);
+			_arrFrameDescriptor[frameNum] = new FrameDescriptor();
+			_pageHashtable.removeMappingForPage(globalPageId.pid);
+		} catch (IOException e) {
+			throw new BufException(null, "Error when trying to free page - IOException");
+		}	
 	}
+	
+	
 	
 	/** Gets the total number of buffers.
 	 *
