@@ -45,7 +45,7 @@ public class PageHashtable{
 	/**
 	 * Return the pair corresponding to page
 	 */
-	public PageFramePair getPairForPage(int page){
+	private PageFramePair getPairForPage(int page){
 		// Get the hash for this page.
 		int pageHash = hash(page);
 		ArrayList lstPair = _arrPairList[pageHash];
