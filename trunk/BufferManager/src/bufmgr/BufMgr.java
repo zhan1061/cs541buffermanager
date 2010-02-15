@@ -10,9 +10,10 @@ import chainexception.*;
  * Describes a frame.
  */
 class FrameDescriptor{
-	PageId _pageNumber = null;
-	int _pinCount;
-	boolean _bDirty;
+	private PageId _pageNumber = null;
+	private int _pinCount;
+	private boolean _bDirty;
+	private boolean _bEmpty;
 	
 	public FrameDescriptor(){
 		// Initialize members
@@ -20,6 +21,7 @@ class FrameDescriptor{
 		_pageNumber.pid = Constants.NO_PAGE;
 		_pinCount = 0;
 		_bDirty = false;
+		_bEmpty = false;
 	}
 
 	public int getPage(){
@@ -157,7 +159,7 @@ public class BufMgr{
 			// frame is available, throw an exception. If one is, reflect the
 			// mapping in the hashtable.
 			
-			if(_arrFrameDescriptor[frameToUse]._bDirty){
+			if(_arrFrameDescriptor[frameToUse].isDirty()){
 				flushPage(pinPgId);
 			}
 			
