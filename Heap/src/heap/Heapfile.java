@@ -163,10 +163,15 @@ public class Heapfile {
 		DirectoryPage curDirPage = null;
 		boolean exists = false;
 		while(!exists && curDirPageId.pid!= GlobalConst.INVALID_PAGE){
-			SystemDefs.JavabaseBM.pinPage(curDirPageId, currPage, false);
+			try{
+				SystemDefs.JavabaseBM.pinPage(curDirPageId, currPage, false);
+			}
+			catch(Exception e){
+				throw new HFBufMgrException(e,"Pin Page Failed");
+			}
 			curDirPage = new DirectoryPage(currPage); 
 			
-			for(int i=0; i<curDirPage._totalEntries; i++)
+			for(int i=0; i<curDirPage.getTotalEntries(); i++)
 			{
 				PageDirectoryEntry dirEntry = null;
 				dirEntry = curDirPage.getPageDirectoryEntry(i);
@@ -199,6 +204,83 @@ public class Heapfile {
 
 	
 	
+	public boolean updateRecord(RID rid, Tuple newTuple)throws InvalidSlotNumberException, InvalidUpdateException, InvalidTupleSizeException, HFException, HFDiskMgrException, HFBufMgrException, Exception
+	{
+		PageId curDirPageId = new PageId(_firstPgDirPID);
+		Page currPage = new Page();
+		DirectoryPage curDirPage = null;
+		boolean exists = false;
+		while(!exists && curDirPageId.pid!= GlobalConst.INVALID_PAGE){
+			try{
+				SystemDefs.JavabaseBM.pinPage(curDirPageId, currPage, false);
+			}
+			catch(Exception e){
+				throw new HFBufMgrException(e,"Pin Page Failed");
+			}
+			curDirPage = new DirectoryPage(currPage); 
+			
+			for(int i=0; i<curDirPage.getTotalEntries(); i++)
+			{
+				PageDirectoryEntry dirEntry = null;
+				dirEntry = curDirPage.getPageDirectoryEntry(i);
+				PageId tmp = new PageId(dirEntry.getPID());
+				if (tmp.pid == rid.pageNo.pid)
+				{
+					exists = true;
+					break;
+				}
+			}
+			
+			if(!exists){
+				SystemDefs.JavabaseBM.unpinPage(curDirPageId, false);
+				PageId tmp1 = new PageId(curDirPage.getNextDirectory().getPID());
+				curDirPageId.pid = tmp1.pid;
+				
+			}
+		}//end of while loop
+		if(!exists){
+			return false;
+		}
+
+		
+		
+		HFPage hfDataPage = new HFPage();
+		SystemDefs.JavabaseBM.pinPage(rid.pageNo, hfDataPage, false);
+		Tuple data = hfDataPage.getRecord(rid);
+		
+		if(data.getLength() == newTuple.getLength()){
+			data.tupleCopy(newTuple);
+			try{
+				SystemDefs.JavabaseBM.unpinPage(rid.pageNo, true);
+			}
+			catch(Exception ex){
+				throw new HFBufMgrException(ex, "Failed while unpinning page");
+			}
+			try{
+			SystemDefs.JavabaseBM.unpinPage(curDirPageId, false);
+			}
+			catch(Exception ex){
+				throw new HFBufMgrException(ex, "Failed while unpinning page");
+			}
+		}
+		else{
+			try{
+				SystemDefs.JavabaseBM.unpinPage(rid.pageNo, true);
+			}
+			catch(Exception ex){
+				throw new HFBufMgrException(ex, "Failed while unpinning page");
+			}
+			try{
+			SystemDefs.JavabaseBM.unpinPage(curDirPageId, false);
+			}
+			catch(Exception ex){
+				throw new HFBufMgrException(ex, "Failed while unpinning page");
+			}
+			throw new InvalidUpdateException(null, "Invalid Record Update");
+		}
+		return true;
+	}
+
 	
 	/**
 	 * Returns PageId for the HFPage that has 'recordLength' space in it.
