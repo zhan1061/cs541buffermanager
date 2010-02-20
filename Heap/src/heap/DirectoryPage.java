@@ -46,6 +46,10 @@ public class DirectoryPage extends Page {
 				_directoryEntrySize);
 	}
 	
+	public int getTotalEntries(){
+		return _totalEntries;
+	}
+	
 	/**
 	 * Get page directory entry at offset.
 	 * @param offset
