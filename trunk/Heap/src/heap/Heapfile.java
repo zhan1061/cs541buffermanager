@@ -33,12 +33,13 @@ public class Heapfile {
 					_firstPgDirPID = pageDirectoryPageId.pid;
 					
 					// This directory page is a blank slate. Format it.
-					(SystemDefs.JavabaseBM).pinPage(pageDirectoryPageId, pageDirectoryPage, false);
-					
 					_directoryPage = new DirectoryPage(pageDirectoryPage);
 					
 					// Format directory page.
 					_directoryPage.formatDirectory();
+					
+					// Unpin page.
+					SystemDefs.JavabaseBM.unpinPage(pageDirectoryPageId, true);
 				}else{
 					throw new ChainException(null, "Call to newPage for page directory failed.");
 				}
@@ -55,109 +56,18 @@ public class Heapfile {
 			}
 			
 			PageDirectoryEntry pageDirectoryEntry = _directoryPage.getPageDirectoryEntry(5);			
-			System.out.println(pageDirectoryEntry.getPageId() + " ; " + pageDirectoryEntry.getEntryType());
+			System.out.println(pageDirectoryEntry.getPID() + " ; " + pageDirectoryEntry.getEntryType());
 			
 			pageDirectoryEntry = new PageDirectoryEntry(5, 10, 2);
 			_directoryPage.writePageDirectoryEntry(pageDirectoryEntry, 3);
 			
 			pageDirectoryEntry = _directoryPage.getPageDirectoryEntry(3);			
-			System.out.println(pageDirectoryEntry.getPageId() + " ; " + pageDirectoryEntry.getEntryType());
+			System.out.println(pageDirectoryEntry.getPID() + " ; " + pageDirectoryEntry.getEntryType());
 			
 			pageDirectoryEntry = _directoryPage.getPageDirectoryEntry(5);			
-			System.out.println(pageDirectoryEntry.getPageId() + " ; " + pageDirectoryEntry.getEntryType());
+			System.out.println(pageDirectoryEntry.getPID() + " ; " + pageDirectoryEntry.getEntryType());
 		}else{
 			throw new ChainException(null, "DB object not created.");
-		}
-	}
-	
-	/**
-	 * It is assumed that the database has already been selected and that the
-	 * disk manager and buffer manager modules are properly initialized.
-	 * 
-	 * @param fname Heap file name.
-	 */
-	public Heapfile(String fname, boolean bDummy) throws ChainException, IOException{
-		// Read in file directory page.
-		PageId fileDirectoryPageId = new PageId();
-		Page fileDirectoryPage = new Page();
-		Hashtable<String, Integer> htFileDirectory = null;
-		
-		try{
-			// Pin the file-directory page
-			fileDirectoryPageId.pid = Constants.FILE_DIR_PAGEID;
-			(SystemDefs.JavabaseBM).pinPage(fileDirectoryPageId, fileDirectoryPage, false);
-		}catch(Exception exception){
-			throw new ChainException(exception, "Unable to access file directory."); 
-		}
-		
-		if(fileDirectoryPage != null){
-			// Check if header is present.
-			byte[] data = fileDirectoryPage.getpage();
-			boolean bHeaderMatch = true;
-			
-			for(int fileHeaderOffset = 0; fileHeaderOffset < Constants.FILE_DIR_HEADER.length();
-				fileHeaderOffset++){
-				if(Constants.FILE_DIR_HEADER.charAt(fileHeaderOffset) != (char)data[fileHeaderOffset]){
-					bHeaderMatch = false;
-				}
-			}
-			
-			if(bHeaderMatch == false){
-				// Header not found. This means that there is no file directory page.
-				// This would be a good time to create one.
-				for(int fileHeaderOffset = 0; fileHeaderOffset < Constants.FILE_DIR_HEADER.length();
-					fileHeaderOffset++){
-					data[fileHeaderOffset] = (byte)Constants.FILE_DIR_HEADER.charAt(fileHeaderOffset);
-				}
-				
-				// Create a hashtable and lay it out on the page.
-				htFileDirectory = new Hashtable<String, Integer>();
-				
-				// Find a new page for our page directory.
-				Page pageDirectoryPage = new Page();
-				PageId pageDirectoryPageId = (SystemDefs.JavabaseBM).newPage(pageDirectoryPage, 1);
-				_firstPgDirPID = pageDirectoryPageId.pid;
-				
-				htFileDirectory.put(fname, pageDirectoryPageId.pid);
-				
-				// Write htFileDirectory.
-				byte[] serializedHTFileDirectory = getSerializedForm(htFileDirectory);
-				
-				System.arraycopy(serializedHTFileDirectory, 0, data, Constants.FILE_DIR_HEADER.length(), 
-						serializedHTFileDirectory.length);
-			}else{
-				// Header found. So the file directory does indeed exist. Read and update it (if required).
-				// Read the serialized form of the hashtable size to figure out how big an array to create to
-				// read in the table.
-				byte[] serializedHTFileDirectory = new byte[data.length - Constants.FILE_DIR_HEADER.length()];
-				
-				System.arraycopy(data, Constants.FILE_DIR_HEADER.length(), serializedHTFileDirectory, 0, 
-						serializedHTFileDirectory.length);
-				
-				htFileDirectory = (Hashtable<String, Integer>)getDeserializedForm(serializedHTFileDirectory);
-
-				// Find a new page for our page directory.
-				Page pageDirectoryPage = new Page();
-				PageId pageDirectoryPageId = (SystemDefs.JavabaseBM).newPage(pageDirectoryPage, 1);				
-				
-				if(htFileDirectory.containsKey(fname) == false){
-					_firstPgDirPID = pageDirectoryPageId.pid;
-					htFileDirectory.put(fname, pageDirectoryPageId.pid);
-				}else{
-					_firstPgDirPID = htFileDirectory.get(fname);
-				}
-				
-				prettyPrintFileDirectory(htFileDirectory);
-			}
-			
-			// Unpin file directory page.
-			(SystemDefs.JavabaseBM).unpinPage(fileDirectoryPageId, true);
-//			(SystemDefs.JavabaseBM).unpinPage(fileDirectoryPageId, true);
-			
-			// Flush page.			
-			(SystemDefs.JavabaseBM).flushPage(fileDirectoryPageId);
-		}else{
-			throw new ChainException(null, "Unable to get file directory page.");
 		}
 	}
 	
@@ -184,57 +94,141 @@ public class Heapfile {
 		}
 	}
 	
-	/**
-	 * Returns the serialized form of object.
-	 * 
-	 * @param object Object to serialize
-	 * @return Serialized form of object. Null returned in case of an exception.
-	 */
-	private byte[] getSerializedForm(Object object){
-		byte[] serializedData = null;
+	public RID insertRecord(byte[] recordData) throws ChainException{
+		RID rid = new RID();
+		PageId hfPageId = getAvailableHFPageId(recordData.length);
+		Page page = new Page();
 		
-		try{
-			ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-			ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream);
+		// Pin page
+		try {
+			SystemDefs.JavabaseBM.pinPage(hfPageId, page, false);
+
+			// Create HFPage from page.
+			HFPage hfPage = new HFPage(page);
+			rid = hfPage.insertRecord(recordData);
 			
-			objectOutputStream.writeObject(object);
-			objectOutputStream.flush();
-			byteArrayOutputStream.flush();
+			// Update directory entry corresponding to hfPage with new available space.
+			updateHFPageAvailableSpace(hfPageId, hfPage.available_space());
 			
-			serializedData = byteArrayOutputStream.toByteArray();
-			
-			// Close streams.
-			objectOutputStream.close();
-			byteArrayOutputStream.close();
-		}catch(Exception exception){
-			// Do nothing.
+			SystemDefs.JavabaseBM.unpinPage(hfPageId, true);
+		} catch (Exception exception) {
+			throw new ChainException(exception, "Unable to pin page.");
 		}
 		
-		return serializedData;
+		return rid;
+	}
+	
+	private void updateHFPageAvailableSpace(PageId hfPageId, int availableSpace) throws ChainException{
+		int currPgDirPID = _firstPgDirPID;
+		
+		// Start search loop.
+		while(currPgDirPID != GlobalConst.INVALID_PAGE){
+			// Pin page with PID currPgDirPID.
+			Page currPage = new Page();
+			PageId currPageId = new PageId(currPgDirPID);
+			
+			try{
+				SystemDefs.JavabaseBM.pinPage(currPageId, currPage, false);
+			}catch(Exception exception){
+				throw new ChainException(exception, "Unable to pin directory page.");
+			}
+			
+			DirectoryPage currDirPage = new DirectoryPage(currPage);
+			
+			if(currDirPage.updateHFPageAvailableSpace(hfPageId, availableSpace)){
+				// Space updated.
+				try{
+					SystemDefs.JavabaseBM.unpinPage(currPageId, true);
+				}catch(Exception exception){
+					throw new ChainException(exception, "Unable to pin directory page.");
+				}
+				
+				return;
+			}
+			
+			// Next directory.
+			currPgDirPID = currDirPage.getNextDirectory().getPID();
+			
+			try{
+				SystemDefs.JavabaseBM.unpinPage(currPageId, true);
+			}catch(Exception exception){
+				throw new ChainException(exception, "Unable to pin directory page.");
+			}
+		}
 	}
 	
 	/**
-	 * Returns the deserialized form of data.
-	 * 
-	 * @param data Data to deserialize.
-	 * @return Deserialized form of data.
+	 * Returns PageId for the HFPage that has 'recordLength' space in it.
+	 * @param recordLength
+	 * @return PageId for the HFPage that has 'recordLength' space in it.
+	 * @throws ChainException
 	 */
-	private Object getDeserializedForm(byte[] data){
-		Object object = null;
+	private PageId getAvailableHFPageId(int recordLength) throws ChainException{
+		PageId availableHFPageId = null;
+		int currPgDirPID = _firstPgDirPID;
 		
-		try{
-			ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(data);
-			ObjectInputStream objectInputStream = new ObjectInputStream(byteArrayInputStream);
+		// Start search loop.
+		while(true){
+			// Pin page with PID currPgDirPID.
+			Page currPage = new Page();
+			PageId currPageId = new PageId(currPgDirPID);
 			
-			object = objectInputStream.readObject();
+			try{
+				SystemDefs.JavabaseBM.pinPage(currPageId, currPage, false);
+			}catch(Exception exception){
+				throw new ChainException(exception, "Unable to pin directory page.");
+			}
 			
-			// Close streams.
-			objectInputStream.close();
-			byteArrayInputStream.close();
-		}catch(Exception exception){
-			// Do nothing.
+			DirectoryPage currDirPage = new DirectoryPage(currPage);
+			
+			// Search within currDirPage for available HFPage
+			if((availableHFPageId = currDirPage.getPageWithSpaceForRecord(recordLength)) != null){
+				// Unpin the current directory page. The page may have been modified.
+				SystemDefs.JavabaseBM.unpinPage(currPageId, true);
+				
+				return availableHFPageId;
+			}else{
+				// No space available in this directory. Use the next directory.
+				currPgDirPID = currDirPage.getNextDirectory().getPID();
+				
+				// Check if this is a valid PID.
+				if(currPgDirPID == GlobalConst.INVALID_PAGE){
+					// No directory entry found here. Create a new
+					// directory page and set it as the next directory
+					// of the current directory.
+					PageId newPageDirectoryPageId = new PageId();
+					Page newPageDirectoryPage = new Page();
+					
+					try{
+						newPageDirectoryPageId = SystemDefs.JavabaseBM.newPage(newPageDirectoryPage, 1);
+
+						if(newPageDirectoryPageId != null){
+							// This directory page is a blank slate. Format it.
+							DirectoryPage newDirPage = new DirectoryPage(newPageDirectoryPage);
+
+							// Format directory page.
+							newDirPage.formatDirectory();
+
+							// Set this as the next directory entry.
+							currDirPage.setNextDirectory(
+									new PageDirectoryEntry(newPageDirectoryPageId.pid, 0, 
+											PageDirectoryEntry.DIRECTORYPAGE_ENTRY));
+							
+							// Unpin new and current directory pages.
+							SystemDefs.JavabaseBM.unpinPage(newPageDirectoryPageId, true);
+							SystemDefs.JavabaseBM.unpinPage(new PageId(currPgDirPID), true);
+							
+							currPgDirPID = newPageDirectoryPageId.pid;
+						}else{
+							throw new ChainException(null, "Unable to allocate new page.");
+						}
+					}catch(Exception exception){
+						throw new ChainException(exception, "Unable to create new directory page.");
+					}
+				}else{
+					SystemDefs.JavabaseBM.unpinPage(new PageId(currPgDirPID), true);
+				}
+			}
 		}
-		
-		return object;
 	}
 }

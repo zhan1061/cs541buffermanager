@@ -116,4 +116,107 @@ public class DirectoryPage extends Page {
 		
 		return entrySize;
 	}
+
+	/**
+	 * Updates space for page corresponding to hfPageId. Returns true if
+	 * update is successful. Otherwise returns false.
+	 * @param hfPageId
+	 * @param availableSpace
+	 * @return
+	 */
+	public boolean updateHFPageAvailableSpace(PageId hfPageId, int availableSpace) throws ChainException{
+		int offset = 0;
+		
+		for(offset = 0; offset < _totalEntries - 1; offset++){
+			// Get page directory entry at this offset.
+			PageDirectoryEntry pageDirectoryEntry = getPageDirectoryEntry(offset);
+			
+			if(pageDirectoryEntry.getPID() == hfPageId.pid){
+				pageDirectoryEntry.setAvailableSpace(availableSpace);
+				
+				// Write pageDirectoryEntry back.
+				writePageDirectoryEntry(pageDirectoryEntry, offset);
+				
+				return true;
+			}
+		}
+		
+		return false;
+	}
+	
+	/**
+	 * Returns PageId of the page with space to store a record of size
+	 * recordLength. Also takes into account the amount of space
+	 * needed to store slot details.
+	 * @param recordLength
+	 * @return
+	 */
+	public PageId getPageWithSpaceForRecord(int recordLength) throws ChainException{
+		int offset = 0;
+		
+		for(offset = 0; offset < _totalEntries - 1; offset++){
+			// Get page directory entry at this offset.
+			PageDirectoryEntry pageDirectoryEntry = getPageDirectoryEntry(offset);
+			
+			if(pageDirectoryEntry.getPID() != INVALID_PAGE){
+				// Pull page with this PID into the buffer pool.
+				PageId hfPageId = new PageId(pageDirectoryEntry.getPID());
+				Page foundPage = new Page();
+				
+				try{
+					(SystemDefs.JavabaseBM).pinPage(hfPageId, foundPage, false);
+					
+					// Page pinned.
+					HFPage foundHFPage = new HFPage(foundPage);
+					
+					// Check available space. If enough, return hfPageId.
+					if(foundHFPage.available_space() >= recordLength + HFPage.SIZE_OF_SLOT){
+						// Unpin page.
+						(SystemDefs.JavabaseBM).unpinPage(hfPageId, false);
+						
+						return hfPageId;
+					}else{
+						// Unpin page.
+						(SystemDefs.JavabaseBM).unpinPage(hfPageId, false);
+					}
+				}catch(Exception exception){
+					throw new ChainException(exception, "Unable to pin HFPage.");
+				}
+			}
+		}
+		
+		// We haven't yet found a valid HFPage with enough space available in it.
+		// Look for a page directory entry that doesn't have an HFPage assigned to it.
+		for(offset = 0; offset < _totalEntries - 1; offset++){
+			// Get page directory entry at this offset.
+			PageDirectoryEntry pageDirectoryEntry = getPageDirectoryEntry(offset);
+			
+			if(pageDirectoryEntry.getPID() == INVALID_PAGE){
+				// Create new HFPage. Return its ID.
+				PageId newPageId = new PageId();
+				Page newPage = new Page();
+				
+				try{
+					newPageId = (SystemDefs.JavabaseBM).newPage(newPage, 1);
+					HFPage newHFPage = new HFPage(newPage);
+					
+					newHFPage.init(newPageId, newPage);
+					pageDirectoryEntry.setPID(newPageId.pid);
+					pageDirectoryEntry.setAvailableSpace(newHFPage.available_space());					
+					
+					// Write pageDirectoryEntry
+					writePageDirectoryEntry(pageDirectoryEntry, offset);
+					
+					// Unpin the page.
+					(SystemDefs.JavabaseBM).unpinPage(newPageId, true);
+					
+					return newPageId;
+				}catch(Exception exception){
+					throw new ChainException(exception, "Unable to create/init new HFPage.");
+				}
+			}
+		}
+		
+		return null;
+	}
 }
