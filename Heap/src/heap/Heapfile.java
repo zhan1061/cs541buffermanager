@@ -157,6 +157,49 @@ public class Heapfile {
 		}
 	}
 	
+	public Tuple getRecord(RID rid) throws InvalidSlotNumberException, InvalidTupleSizeException, HFException, HFDiskMgrException, HFBufMgrException, Exception{
+		PageId curDirPageId = new PageId(_firstPgDirPID);
+		Page currPage = new Page();
+		DirectoryPage curDirPage = null;
+		boolean exists = false;
+		while(!exists && curDirPageId.pid!= GlobalConst.INVALID_PAGE){
+			SystemDefs.JavabaseBM.pinPage(curDirPageId, currPage, false);
+			curDirPage = new DirectoryPage(currPage); 
+			
+			for(int i=0; i<curDirPage._totalEntries; i++)
+			{
+				PageDirectoryEntry dirEntry = null;
+				dirEntry = curDirPage.getPageDirectoryEntry(i);
+				PageId tmp = new PageId(dirEntry.getPID());
+				if (tmp.pid == rid.pageNo.pid)
+				{
+					exists = true;
+					break;
+				}
+			}
+			
+			if(!exists){
+				SystemDefs.JavabaseBM.unpinPage(curDirPageId, false);
+				PageId tmp1 = new PageId(curDirPage.getNextDirectory().getPID());
+				curDirPageId.pid = tmp1.pid;
+				
+			}
+		}//end of while loop
+		if(!exists){
+			return null;
+		}
+
+		HFPage hfDataPage = new HFPage();
+		SystemDefs.JavabaseBM.pinPage(rid.pageNo, hfDataPage, false);
+		Tuple data = hfDataPage.getRecord(rid);
+		SystemDefs.JavabaseBM.unpinPage(rid.pageNo, false);
+		SystemDefs.JavabaseBM.unpinPage(curDirPageId, false);
+		return data;
+	}
+
+	
+	
+	
 	/**
 	 * Returns PageId for the HFPage that has 'recordLength' space in it.
 	 * @param recordLength
