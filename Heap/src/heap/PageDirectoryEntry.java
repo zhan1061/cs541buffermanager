@@ -23,7 +23,7 @@ public class PageDirectoryEntry implements Serializable{
 		_entryType = entryType;
 	}
 	
-	public int getPageId(){
+	public int getPID(){
 		return _pid;
 	}
 	
@@ -33,5 +33,17 @@ public class PageDirectoryEntry implements Serializable{
 	
 	public int getEntryType(){
 		return _entryType;
+	}
+	
+	public void setPID(int pid){
+		_pid = pid;
+	}
+	
+	public void setAvailableSpace(int availableSpace){
+		_availableSpace = availableSpace;
+	}
+	
+	public void setEntryType(int entryType){
+		_entryType = entryType;
 	}
 }
