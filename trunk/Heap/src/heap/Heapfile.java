@@ -12,8 +12,9 @@ import chainexception.*;
 public class Heapfile {
 	private int _firstPgDirPID = Constants.INVALID_PID; 
 	private DirectoryPage _directoryPage = null;
-	
+	private String fileName;
 	public Heapfile(String fname) throws ChainException, IOException{
+		this.fileName = fname;
 		if(SystemDefs.JavabaseDB != null){
 			// Check if the relevant file entry exists. If it
 			// does, set _firstPgDirPID to the corresponding
@@ -162,6 +163,7 @@ public class Heapfile {
 		Page currPage = new Page();
 		DirectoryPage curDirPage = null;
 		boolean exists = false;
+		PageDirectoryEntry dirEntry = null;
 		while(!exists && curDirPageId.pid!= GlobalConst.INVALID_PAGE){
 			try{
 				SystemDefs.JavabaseBM.pinPage(curDirPageId, currPage, false);
@@ -173,7 +175,6 @@ public class Heapfile {
 			
 			for(int i=0; i<curDirPage.getTotalEntries(); i++)
 			{
-				PageDirectoryEntry dirEntry = null;
 				dirEntry = curDirPage.getPageDirectoryEntry(i);
 				PageId tmp = new PageId(dirEntry.getPID());
 				if (tmp.pid == rid.pageNo.pid)
@@ -195,9 +196,9 @@ public class Heapfile {
 		}
 
 		HFPage hfDataPage = new HFPage();
-		SystemDefs.JavabaseBM.pinPage(rid.pageNo, hfDataPage, false);
+		SystemDefs.JavabaseBM.pinPage(new PageId(dirEntry.getPID()), hfDataPage, false);
 		Tuple data = hfDataPage.getRecord(rid);
-		SystemDefs.JavabaseBM.unpinPage(rid.pageNo, false);
+		SystemDefs.JavabaseBM.unpinPage(new PageId(dirEntry.getPID()), false);
 		SystemDefs.JavabaseBM.unpinPage(curDirPageId, false);
 		return data;
 	}
@@ -210,18 +211,19 @@ public class Heapfile {
 		Page currPage = new Page();
 		DirectoryPage curDirPage = null;
 		boolean exists = false;
+		PageDirectoryEntry dirEntry = null;
 		while(!exists && curDirPageId.pid!= GlobalConst.INVALID_PAGE){
 			try{
 				SystemDefs.JavabaseBM.pinPage(curDirPageId, currPage, false);
 			}
 			catch(Exception e){
-				throw new HFBufMgrException(e,"Pin Page Failed");
+				throw new HFBufMgrException(e,"Pin Page Failed in updateRecord");
 			}
 			curDirPage = new DirectoryPage(currPage); 
 			
 			for(int i=0; i<curDirPage.getTotalEntries(); i++)
 			{
-				PageDirectoryEntry dirEntry = null;
+				
 				dirEntry = curDirPage.getPageDirectoryEntry(i);
 				PageId tmp = new PageId(dirEntry.getPID());
 				if (tmp.pid == rid.pageNo.pid)
@@ -242,45 +244,215 @@ public class Heapfile {
 			return false;
 		}
 
-		
-		
 		HFPage hfDataPage = new HFPage();
-		SystemDefs.JavabaseBM.pinPage(rid.pageNo, hfDataPage, false);
+		SystemDefs.JavabaseBM.pinPage(new PageId(dirEntry.getPID()), hfDataPage, false);
 		Tuple data = hfDataPage.getRecord(rid);
 		
 		if(data.getLength() == newTuple.getLength()){
 			data.tupleCopy(newTuple);
 			try{
-				SystemDefs.JavabaseBM.unpinPage(rid.pageNo, true);
+				SystemDefs.JavabaseBM.unpinPage(new PageId(dirEntry.getPID()), true);
 			}
 			catch(Exception ex){
-				throw new HFBufMgrException(ex, "Failed while unpinning page");
+				throw new HFBufMgrException(ex, "Failed while unpinning page in updateRecord");
 			}
 			try{
 			SystemDefs.JavabaseBM.unpinPage(curDirPageId, false);
 			}
 			catch(Exception ex){
-				throw new HFBufMgrException(ex, "Failed while unpinning page");
+				throw new HFBufMgrException(ex, "Failed while unpinning page in updateRecord");
 			}
 		}
 		else{
 			try{
-				SystemDefs.JavabaseBM.unpinPage(rid.pageNo, true);
+				SystemDefs.JavabaseBM.unpinPage(new PageId(dirEntry.getPID()), true);
 			}
 			catch(Exception ex){
-				throw new HFBufMgrException(ex, "Failed while unpinning page");
+				throw new HFBufMgrException(ex, "Failed while unpinning page in updateRecord");
 			}
 			try{
 			SystemDefs.JavabaseBM.unpinPage(curDirPageId, false);
 			}
 			catch(Exception ex){
-				throw new HFBufMgrException(ex, "Failed while unpinning page");
+				throw new HFBufMgrException(ex, "Failed while unpinning page in updateRecord");
 			}
-			throw new InvalidUpdateException(null, "Invalid Record Update");
+			throw new InvalidUpdateException(null, "Invalid Record Update - record not updated");
 		}
 		return true;
 	}
 
+	
+	public boolean deleteRecord (RID rid) throws InvalidSlotNumberException, InvalidTupleSizeException, HFException, HFBufMgrException, HFDiskMgrException,Exception
+	{
+		PageId curDirPageId = new PageId(_firstPgDirPID);
+		Page currPage = new Page();
+		DirectoryPage curDirPage = null;
+		boolean exists = false;
+		PageDirectoryEntry dirEntry = null;
+		
+		while(!exists && curDirPageId.pid != GlobalConst.INVALID_PAGE){
+			try{
+				SystemDefs.JavabaseBM.pinPage(curDirPageId, currPage, false);
+			}
+			catch(Exception e){
+				throw new HFBufMgrException(e,"Pin Page Failed in deleteRecord");
+			}
+			curDirPage = new DirectoryPage(currPage); 
+			
+			for(int i=0; i<curDirPage.getTotalEntries(); i++)
+			{
+				dirEntry = curDirPage.getPageDirectoryEntry(i);
+				PageId tmp = new PageId(dirEntry.getPID());
+				if (tmp.pid == rid.pageNo.pid)
+				{
+					exists = true;
+					break;
+				}
+			}
+			
+			if(!exists){
+				try{
+					SystemDefs.JavabaseBM.unpinPage(curDirPageId, false);
+				}
+				catch(Exception ex){
+					throw new HFBufMgrException(ex, "Unpin Page Failed in deleteRecord");
+				}
+				PageId tmp1 = new PageId(curDirPage.getNextDirectory().getPID());
+				curDirPageId.pid = tmp1.pid;
+				
+			}
+			
+		}
+		if(!exists){
+			return false;
+		}
+		
+		
+		HFPage hfDataPage = new HFPage();
+		try{
+			SystemDefs.JavabaseBM.pinPage(new PageId(dirEntry.getPID()), hfDataPage, false);
+		}
+		catch(Exception e){
+			try{
+				SystemDefs.JavabaseBM.unpinPage(curDirPageId, false);
+			}
+			catch(Exception ex){
+				throw new HFBufMgrException(ex, "Failed while unpinning page in deleteRecord");
+			}
+			throw new HFBufMgrException(e, "Failed pinning page in deleteRecord");
+		}
+		hfDataPage.deleteRecord(rid);
+		dirEntry.setAvailableSpace(hfDataPage.available_space());
+		//dec recct by 1
+		
+		try{
+			SystemDefs.JavabaseBM.unpinPage(new PageId(dirEntry.getPID()), true);
+		}
+		catch(Exception e){
+			try{
+				SystemDefs.JavabaseBM.unpinPage(curDirPageId, false);
+			}
+			catch(Exception ex){
+				throw new HFBufMgrException(ex, "Failed while unpinning page in deleteRecord");
+			}
+			
+		}
+
+		//delete the page itself if it is empty now aft deleting the record - should i do this before unpinning????
+		if(hfDataPage.empty()){
+			try{
+				SystemDefs.JavabaseBM.freePage(rid.pageNo);
+			}
+			catch(Exception e){
+				try{
+					SystemDefs.JavabaseBM.unpinPage(curDirPageId, false);
+				}
+				catch(Exception ex){
+					throw new HFBufMgrException(ex, "Failed while unpinning page in deleteRecord");
+				}
+			}
+			
+			//remove this from  directory page also
+			//this fn does not exist as of now!!!
+			//dirEntry.deleteEntry();
+		}
+        
+		//handle the case if the directory page itself becomes empty
+//		if(curDirPage.empty()){//implement empty() in DirectoryPage
+//			
+//		} 
+		
+		else{
+			try{
+				SystemDefs.JavabaseBM.unpinPage(curDirPageId, true);
+			}
+			catch(Exception ex){
+				throw new HFBufMgrException(ex,"Unpin page failed in deleteRecord");
+			}
+		}
+		return true;
+	} //end of deleteRecord()
+	
+	/*---------------------------------------------------*/
+	public void deleteFile() throws InvalidSlotNumberException, FileAlreadyDeletedException, InvalidTupleSizeException, HFBufMgrException, HFDiskMgrException, IOException
+	{
+		PageId curDirPageId = new PageId(_firstPgDirPID);
+		Page currPage = new Page();
+		DirectoryPage curDirPage = null;
+		boolean exists = false;
+		PageDirectoryEntry dirEntry = null;
+		PageId nextDirPageId = new PageId();
+		
+		while(!exists && curDirPageId.pid != GlobalConst.INVALID_PAGE){
+			try{
+				SystemDefs.JavabaseBM.pinPage(curDirPageId, currPage, false);
+			}
+			catch(Exception e){
+				throw new HFBufMgrException(e,"Pin Page Failed in deleteFile");
+			}
+			curDirPage = new DirectoryPage(currPage); 
+			
+			for(int i=0; i<curDirPage.getTotalEntries(); i++)
+			{
+				dirEntry = curDirPage.getPageDirectoryEntry(i);
+//				PageId tmp = new PageId(dirEntry.getPID());
+//				if (tmp.pid == rid.pageNo.pid)
+//				{
+//					exists = true;
+//					break;
+//				}
+				try {
+					SystemDefs.JavabaseBM.freePage(new PageId(dirEntry.getPID()));
+				} catch (Exception e) {
+					throw new HFBufMgrException(e,"Free Page Failed during file delete");
+				} 
+				
+			}
+			
+			PageId tmp1 = new PageId(curDirPage.getNextDirectory().getPID());
+			nextDirPageId.pid = tmp1.pid;
+			try{
+					SystemDefs.JavabaseBM.unpinPage(curDirPageId, false);
+			}
+				catch(Exception ex){
+					throw new HFBufMgrException(ex, "Unpin Page Failed in deleteFile");
+				}
+			try{
+				
+				SystemDefs.JavabaseBM.freePage(curDirPageId);
+			}
+			catch(Exception e){
+				throw new HFBufMgrException(e,"Free Page Failed for directory page in deleteFile");
+			}
+			curDirPageId = nextDirPageId;
+		}
+		try {
+			SystemDefs.JavabaseDB.delete_file_entry(fileName);
+		} catch (Exception e) {
+			throw new HFDiskMgrException(e, "Error deleting file entry");
+		}
+	}
+/* --------------------------------------------------*/
 	
 	/**
 	 * Returns PageId for the HFPage that has 'recordLength' space in it.
