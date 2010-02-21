@@ -9,9 +9,9 @@ public class InvalidUpdateException extends ChainException{
      super();
   }
 
-  public InvalidUpdateException (Exception ex, String name)
+  public InvalidUpdateException (Exception e, String name)
   {
-    super(ex, name);
+    super(e, name);
   }
 
 }

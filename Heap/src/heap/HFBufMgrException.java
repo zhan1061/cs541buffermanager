@@ -10,8 +10,8 @@ public class HFBufMgrException extends ChainException{
   
   }
 
-  public HFBufMgrException(Exception ex, String name)
+  public HFBufMgrException(Exception e, String name)
   {
-    super(ex, name);
+    super(e, name);
   }
 }

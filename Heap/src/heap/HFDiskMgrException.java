@@ -10,8 +10,8 @@ public class HFDiskMgrException extends ChainException{
   
   }
 
-  public HFDiskMgrException(Exception ex, String name)
+  public HFDiskMgrException(Exception e, String name)
   {
-    super(ex, name);
+    super(e, name);
   }
 }

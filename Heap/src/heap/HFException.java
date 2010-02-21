@@ -10,9 +10,9 @@ public class HFException extends ChainException{
   
   }
 
-  public HFException(Exception ex, String name)
+  public HFException(Exception e, String name)
   {
-    super(ex, name);
+    super(e, name);
   }
 
 
