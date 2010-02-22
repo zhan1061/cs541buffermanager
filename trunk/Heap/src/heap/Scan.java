@@ -41,7 +41,7 @@ public class Scan {
 		}
 	}
 	
-	public void closeScan(){
+	public void closescan(){
 		if(_currDirPID != GlobalConst.INVALID_PAGE){
 			// Unpin this.
 			try{
@@ -147,7 +147,6 @@ public class Scan {
 		return false;
 	}
 
-	
 	/**
 	 * Returns next tuple in the scan.
 	 * @param rid
