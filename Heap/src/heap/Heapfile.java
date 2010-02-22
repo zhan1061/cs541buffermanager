@@ -55,13 +55,6 @@ public class Heapfile {
 			}else{
 				// File entry found.
 				_firstPgDirPID = fileHeaderPageId.pid;
-//				Page pageDirectoryPage = new Page();
-//				PageId pageDirectoryPageId = new PageId();
-//				pageDirectoryPageId.pid = _firstPgDirPID;
-				
-//				(SystemDefs.JavabaseBM).pinPage(pageDirectoryPageId, pageDirectoryPage, false);
-//				
-//				_directoryPage = new DirectoryPage(pageDirectoryPage);
 			}			
 		}else{
 			throw new ChainException(null, "DB object not created.");
@@ -318,6 +311,15 @@ public class Heapfile {
 		
 		if(data.getLength() == newTuple.getLength()){
 			data.tupleCopy(newTuple);
+			
+			// Trying another way of updating the record.
+			// Get the slot offset.
+			// Let's use arrayCopy to do this the hard way...
+			System.arraycopy(newTuple.getTupleByteArray(), 0, hfDataPage.getHFpageArray(), 
+					hfDataPage.getSlotOffset(rid.slotNo), newTuple.getTupleByteArray().length);
+			
+//			System.out.println(hfDataPage.getSlotOffset(rid.slotNo));
+			
 			try{
 				SystemDefs.JavabaseBM.unpinPage(new PageId(dirEntry.getPID()), true);
 			}
