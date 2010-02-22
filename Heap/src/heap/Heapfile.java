@@ -13,6 +13,7 @@ public class Heapfile {
 	private int _firstPgDirPID = Constants.INVALID_PID; 
 	private DirectoryPage _directoryPage = null;
 	private String fileName;
+	
 	public Heapfile(String fname) throws ChainException, IOException{
 		this.fileName = fname;
 		if(SystemDefs.JavabaseDB != null){
@@ -41,32 +42,27 @@ public class Heapfile {
 					
 					// Unpin page.
 					SystemDefs.JavabaseBM.unpinPage(pageDirectoryPageId, true);
+					
+					// Add new directory entry.
+					try{
+						SystemDefs.JavabaseDB.add_file_entry(fname, new PageId(_firstPgDirPID));
+					}catch(Exception exception){
+						throw new ChainException(exception, "Unable to add file entry to database.");
+					}
 				}else{
 					throw new ChainException(null, "Call to newPage for page directory failed.");
 				}
 			}else{
 				// File entry found.
 				_firstPgDirPID = fileHeaderPageId.pid;
-				Page pageDirectoryPage = new Page();
-				PageId pageDirectoryPageId = new PageId();
-				pageDirectoryPageId.pid = _firstPgDirPID;
+//				Page pageDirectoryPage = new Page();
+//				PageId pageDirectoryPageId = new PageId();
+//				pageDirectoryPageId.pid = _firstPgDirPID;
 				
-				(SystemDefs.JavabaseBM).pinPage(pageDirectoryPageId, pageDirectoryPage, false);
-				
-				_directoryPage = new DirectoryPage(pageDirectoryPage);
-			}
-			
-			PageDirectoryEntry pageDirectoryEntry = _directoryPage.getPageDirectoryEntry(5);			
-			System.out.println(pageDirectoryEntry.getPID() + " ; " + pageDirectoryEntry.getEntryType());
-			
-			pageDirectoryEntry = new PageDirectoryEntry(5, 10, 2);
-			_directoryPage.writePageDirectoryEntry(pageDirectoryEntry, 3);
-			
-			pageDirectoryEntry = _directoryPage.getPageDirectoryEntry(3);			
-			System.out.println(pageDirectoryEntry.getPID() + " ; " + pageDirectoryEntry.getEntryType());
-			
-			pageDirectoryEntry = _directoryPage.getPageDirectoryEntry(5);			
-			System.out.println(pageDirectoryEntry.getPID() + " ; " + pageDirectoryEntry.getEntryType());
+//				(SystemDefs.JavabaseBM).pinPage(pageDirectoryPageId, pageDirectoryPage, false);
+//				
+//				_directoryPage = new DirectoryPage(pageDirectoryPage);
+			}			
 		}else{
 			throw new ChainException(null, "DB object not created.");
 		}
@@ -95,6 +91,12 @@ public class Heapfile {
 		}
 	}
 	
+	public Scan openScan() throws IOException, InvalidTupleSizeException, ChainException{
+		Scan scan = new Scan(this);
+		
+		return scan;
+	}
+	
 	public RID insertRecord(byte[] recordData) throws ChainException{
 		RID rid = new RID();
 		PageId hfPageId = getAvailableHFPageId(recordData.length);
@@ -115,6 +117,12 @@ public class Heapfile {
 		} catch (Exception exception) {
 			throw new ChainException(exception, "Unable to pin page.");
 		}
+		
+//		try{
+//			SystemDefs.JavabaseBM.flushAllPages();
+//		}catch(Exception exception){
+//			throw new ChainException(exception, "Couldn't flush pages.");
+//		}
 		
 		return rid;
 	}
@@ -143,6 +151,12 @@ public class Heapfile {
 				}catch(Exception exception){
 					throw new ChainException(exception, "Unable to pin directory page.");
 				}
+				
+//				try{
+//					SystemDefs.JavabaseBM.flushAllPages();
+//				}catch(Exception exception){
+//					throw new ChainException(exception, "Couldn't flush pages.");
+//				}
 				
 				return;
 			}
@@ -203,7 +217,61 @@ public class Heapfile {
 		return data;
 	}
 
-	
+	public int getRecCnt() throws InvalidSlotNumberException, InvalidTupleSizeException, HFDiskMgrException, HFBufMgrException, IOException{
+		int totalRecords = 0;
+		
+		int currPgDirPID = getPageDirectoryPID();
+
+		// Start search loop.
+		while(currPgDirPID != GlobalConst.INVALID_PAGE){
+			// Pin page with PID currPgDirPID.
+			Page currPage = new Page();
+			PageId currPageId = new PageId(currPgDirPID);
+
+			try{
+				SystemDefs.JavabaseBM.pinPage(currPageId, currPage, false);
+			}catch(Exception exception){
+				throw new IOException("Unable to pin directory page.");
+			}
+
+			DirectoryPage currDirPage = new DirectoryPage(currPage);
+
+			for(int pageDirectoryEntryOffset = 0; pageDirectoryEntryOffset < currDirPage.getTotalEntries() - 1;
+			pageDirectoryEntryOffset++){
+				PageDirectoryEntry pageDirectoryEntry = currDirPage.getPageDirectoryEntry(pageDirectoryEntryOffset);
+				HFPage hfPage = new HFPage();
+
+				if(pageDirectoryEntry.getPID() != GlobalConst.INVALID_PAGE){
+					try{
+						SystemDefs.JavabaseBM.pinPage(new PageId(pageDirectoryEntry.getPID()), hfPage, false);
+
+						// Read the HFPage to get the number of records.
+						for(int slotNumber = 0; slotNumber < hfPage.getSlotCnt(); slotNumber++){
+							if(hfPage.getSlotOffset(slotNumber) != GlobalConst.INVALID_PAGE){
+								totalRecords++;
+							}
+						}
+						
+						// Unpin HFPage
+						SystemDefs.JavabaseBM.unpinPage(new PageId(pageDirectoryEntry.getPID()), false);
+					}catch(Exception exception){
+						throw new HFBufMgrException(exception, "Unable to pin/unpin heapfile page.");
+					}
+				}
+			}
+
+			// Next directory.
+			currPgDirPID = currDirPage.getNextDirectory().getPID();
+
+			try{
+				SystemDefs.JavabaseBM.unpinPage(currPageId, true);
+			}catch(Exception exception){
+				throw new IOException("Unable to unpin directory page.");
+			}
+		}
+		
+		return totalRecords;
+	}
 	
 	public boolean updateRecord(RID rid, Tuple newTuple)throws InvalidSlotNumberException, InvalidUpdateException, InvalidTupleSizeException, HFException, HFDiskMgrException, HFBufMgrException, Exception
 	{
@@ -486,6 +554,7 @@ public class Heapfile {
 				return availableHFPageId;
 			}else{
 				// No space available in this directory. Use the next directory.
+				int oldPgDirPID = currPgDirPID;
 				currPgDirPID = currDirPage.getNextDirectory().getPID();
 				
 				// Check if this is a valid PID.
@@ -513,7 +582,7 @@ public class Heapfile {
 							
 							// Unpin new and current directory pages.
 							SystemDefs.JavabaseBM.unpinPage(newPageDirectoryPageId, true);
-							SystemDefs.JavabaseBM.unpinPage(new PageId(currPgDirPID), true);
+							SystemDefs.JavabaseBM.unpinPage(new PageId(oldPgDirPID), true);
 							
 							currPgDirPID = newPageDirectoryPageId.pid;
 						}else{
@@ -523,7 +592,7 @@ public class Heapfile {
 						throw new ChainException(exception, "Unable to create new directory page.");
 					}
 				}else{
-					SystemDefs.JavabaseBM.unpinPage(new PageId(currPgDirPID), true);
+					SystemDefs.JavabaseBM.unpinPage(new PageId(oldPgDirPID), true);
 				}
 			}
 		}
