@@ -34,7 +34,7 @@ public class DirectoryPage extends Page {
 		byte[] serializedHFPageDirectoryEntry = SerializationUtil.getSerializedForm(initHFPageDirectoryEntry);
 		byte[] serializedDirectoryPageDirectoryEntry = SerializationUtil.getSerializedForm(initDirectoryPageDirectoryEntry);
 		
-		System.out.println("About to write " + _totalEntries + " entries to directory.");
+//		System.out.println("About to write " + _totalEntries + " entries to directory.");
 		
 		// Save the last entry for a pointer to the next directory page.
 		for(int entryOffset = 0; entryOffset < _totalEntries - 1; entryOffset++){
