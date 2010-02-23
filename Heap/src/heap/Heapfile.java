@@ -90,7 +90,15 @@ public class Heapfile {
 		return scan;
 	}
 	
-	public RID insertRecord(byte[] recordData) throws ChainException{
+	public RID insertRecord(byte[] recordData) throws InvalidSlotNumberException, InvalidTupleSizeException, SpaceNotAvailableException, HFException, HFBufMgrException, HFDiskMgrException, IOException, ChainException{
+		if(recordData.length >= HFPage.MAX_SPACE){
+			throw new SpaceNotAvailableException(null, "Record too big for page.");
+		}
+		
+		if(recordData.length == 0){
+			throw new InvalidTupleSizeException(null, "Can't insert empty tuples.");
+		}
+		
 		RID rid = new RID();
 		PageId hfPageId = getAvailableHFPageId(recordData.length);
 		Page page = new Page();
@@ -110,12 +118,6 @@ public class Heapfile {
 		} catch (Exception exception) {
 			throw new ChainException(exception, "Unable to pin page.");
 		}
-		
-//		try{
-//			SystemDefs.JavabaseBM.flushAllPages();
-//		}catch(Exception exception){
-//			throw new ChainException(exception, "Couldn't flush pages.");
-//		}
 		
 		return rid;
 	}
@@ -144,13 +146,7 @@ public class Heapfile {
 				}catch(Exception exception){
 					throw new ChainException(exception, "Unable to pin directory page.");
 				}
-				
-//				try{
-//					SystemDefs.JavabaseBM.flushAllPages();
-//				}catch(Exception exception){
-//					throw new ChainException(exception, "Couldn't flush pages.");
-//				}
-				
+
 				return;
 			}
 			
@@ -240,7 +236,7 @@ public class Heapfile {
 
 						// Read the HFPage to get the number of records.
 						for(int slotNumber = 0; slotNumber < hfPage.getSlotCnt(); slotNumber++){
-							if(hfPage.getSlotOffset(slotNumber) != GlobalConst.INVALID_PAGE){
+							if(hfPage.getSlotOffset(slotNumber) != 0){
 								totalRecords++;
 							}
 						}
@@ -431,7 +427,7 @@ public class Heapfile {
 		//delete the page itself if it is empty now aft deleting the record - should i do this before unpinning????
 		if(hfDataPage.empty()){
 			try{
-				SystemDefs.JavabaseBM.freePage(rid.pageNo);
+//				SystemDefs.JavabaseBM.freePage(rid.pageNo);
 			}
 			catch(Exception e){
 				try{
@@ -482,31 +478,30 @@ public class Heapfile {
 			}
 			curDirPage = new DirectoryPage(currPage); 
 			
-			for(int i=0; i<curDirPage.getTotalEntries(); i++)
+			for(int i=0; i < curDirPage.getTotalEntries(); i++)
 			{
 				dirEntry = curDirPage.getPageDirectoryEntry(i);
-//				PageId tmp = new PageId(dirEntry.getPID());
-//				if (tmp.pid == rid.pageNo.pid)
-//				{
-//					exists = true;
-//					break;
-//				}
-				try {
-					SystemDefs.JavabaseBM.freePage(new PageId(dirEntry.getPID()));
-				} catch (Exception e) {
-					throw new HFBufMgrException(e,"Free Page Failed during file delete");
-				} 
 				
+				// Attempt to free the page referred to by this entry
+				// only if it is a valid non-directory page.
+				if(dirEntry.getPID() != GlobalConst.INVALID_PAGE && 
+						dirEntry.getEntryType() != PageDirectoryEntry.DIRECTORYPAGE_ENTRY){
+					try {
+						SystemDefs.JavabaseBM.freePage(new PageId(dirEntry.getPID()));
+					} catch (Exception e) {
+						throw new HFBufMgrException(e,"Free Page Failed during file delete");
+					} 
+				}
 			}
 			
 			PageId tmp1 = new PageId(curDirPage.getNextDirectory().getPID());
 			nextDirPageId.pid = tmp1.pid;
 			try{
-					SystemDefs.JavabaseBM.unpinPage(curDirPageId, false);
+				SystemDefs.JavabaseBM.unpinPage(curDirPageId, false);
 			}
-				catch(Exception ex){
-					throw new HFBufMgrException(ex, "Unpin Page Failed in deleteFile");
-				}
+			catch(Exception ex){
+				throw new HFBufMgrException(ex, "Unpin Page Failed in deleteFile");
+			}
 			try{
 				
 				SystemDefs.JavabaseBM.freePage(curDirPageId);
