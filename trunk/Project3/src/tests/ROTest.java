@@ -71,9 +71,10 @@ class ROTest extends TestDriver {
     // run all the test cases
     System.out.println("\n" + "Running " + TEST_NAME + "...");
     boolean status = PASS;
-    status &= rot.test1();
-    status &= rot.test2();
-    status &= rot.test3();
+//    status &= rot.test1();
+//    status &= rot.test2();
+//    status &= rot.test3();
+    status &= rot.test4();
 
     // display the final results
     System.out.println();
@@ -376,4 +377,64 @@ class ROTest extends TestDriver {
     }
   } // protected boolean test3()
 
+  protected boolean test4(){
+	  boolean status = PASS;
+	  System.out.println("\nTest 4: Scan test");
+      initCounts();
+      saveCounts(null);
+
+      // create and populate a temporary Drivers file and index
+      Tuple tuple = new Tuple(s_drivers);
+      HeapFile file = new HeapFile(null);
+      HashIndex index = new HashIndex(null);
+      for (int i = 1; i <= 10; i++) {
+
+        // create the tuple
+        tuple.setIntFld(0, i);
+        tuple.setStringFld(1, "f" + i);
+        tuple.setStringFld(2, "l" + i);
+        Float age = (float) (i * 7.7);
+        tuple.setFloatFld(3, age);
+        tuple.setIntFld(4, i + 100);
+
+        // insert the tuple in the file and index
+        RID rid = file.insertRecord(tuple.getData());
+        index.insertEntry(new SearchKey(age), rid);
+
+      } // for
+      
+      // Scan through.
+      try{
+    	  FileScan fileScan = new FileScan(s_drivers, file);
+
+    	  while(fileScan.hasNext()){
+    		  Tuple scannedTuple = fileScan.getNext();
+
+    		  System.out.println("ID: " + scannedTuple.getField(0) + " ; Name: " + 
+    				  scannedTuple.getStringFld(1) + " " + scannedTuple.getStringFld(2));
+    	  }
+    	  
+    	  fileScan.restart();
+    	  
+    	  while(fileScan.hasNext()){
+    		  Tuple scannedTuple = fileScan.getNext();
+
+    		  System.out.println("ID: " + scannedTuple.getField(0) + " ; Name: " + 
+    				  scannedTuple.getStringFld(1) + " " + scannedTuple.getStringFld(2));
+    	  }
+    	  
+    	  fileScan.close();
+    	  
+    	  while(fileScan.hasNext()){
+    		  Tuple scannedTuple = fileScan.getNext();
+
+    		  System.out.println("ID: " + scannedTuple.getField(0) + " ; Name: " + 
+    				  scannedTuple.getStringFld(1) + " " + scannedTuple.getStringFld(2));
+    	  }
+      }catch(Exception exception){
+    	  status = FAIL;
+      }
+      
+      return status;
+  }
 } // class ROTest extends TestDriver

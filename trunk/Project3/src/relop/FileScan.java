@@ -2,18 +2,27 @@ package relop;
 
 import global.RID;
 import heap.HeapFile;
+import heap.HeapScan;
 
 /**
  * Wrapper for heap file scan, the most basic access method. This "iterator"
  * version takes schema into consideration and generates real tuples.
  */
 public class FileScan extends Iterator {
-
+	private HeapFile _heapFile = null;
+	private Schema _schema = null;
+	private HeapScan _heapScan = null;
+	private boolean _bOpen = false;
+	private RID _currRID = null;
+	
 	/**
 	 * Constructs a file scan, given the schema and heap file.
 	 */
 	public FileScan(Schema schema, HeapFile file) {
-		throw new UnsupportedOperationException("Not implemented");
+		_heapFile = file;
+		_schema = schema;		
+		_heapScan = _heapFile.openScan();
+		_bOpen = true;
 	}
 
 	/**
@@ -21,35 +30,41 @@ public class FileScan extends Iterator {
 	 * child iterators, and increases the indent depth along the way.
 	 */
 	public void explain(int depth) {
-		throw new UnsupportedOperationException("Not implemented");
+		// No children for this guy.
+		System.out.println("FileScan : Iterator");
 	}
 
 	/**
 	 * Restarts the iterator, i.e. as if it were just constructed.
 	 */
 	public void restart() {
-		throw new UnsupportedOperationException("Not implemented");
+		// Reinitialize _heapScan
+		_heapScan.close();
+		_bOpen = false;
+		_heapScan = _heapFile.openScan();
+		_bOpen = true;
 	}
 
 	/**
 	 * Returns true if the iterator is open; false otherwise.
 	 */
 	public boolean isOpen() {
-		throw new UnsupportedOperationException("Not implemented");
+		return _bOpen;
 	}
 
 	/**
 	 * Closes the iterator, releasing any resources (i.e. pinned pages).
 	 */
 	public void close() {
-		throw new UnsupportedOperationException("Not implemented");
+		_heapScan.close();
+		_bOpen = false;
 	}
 
 	/**
 	 * Returns true if there are more tuples, false otherwise.
 	 */
 	public boolean hasNext() {
-		throw new UnsupportedOperationException("Not implemented");
+		return _heapScan.hasNext();
 	}
 
 	/**
@@ -57,15 +72,19 @@ public class FileScan extends Iterator {
 	 * 
 	 * @throws IllegalStateException if no more tuples
 	 */
-	public Tuple getNext() {
-		throw new UnsupportedOperationException("Not implemented");
+	public Tuple getNext() throws IllegalStateException{
+		_currRID = new RID();
+		byte[] nextRecordData = _heapScan.getNext(_currRID);
+		Tuple tuple = new Tuple(_schema, nextRecordData);		
+		
+		return tuple;
 	}
 
 	/**
 	 * Gets the RID of the last tuple returned.
 	 */
 	public RID getLastRID() {
-		throw new UnsupportedOperationException("Not implemented");
+		return _currRID;
 	}
 
 } // public class FileScan extends Iterator
