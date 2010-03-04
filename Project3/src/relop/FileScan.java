@@ -10,7 +10,6 @@ import heap.HeapScan;
  */
 public class FileScan extends Iterator {
 	private HeapFile _heapFile = null;
-	private Schema _schema = null;
 	private HeapScan _heapScan = null;
 	private boolean _bOpen = false;
 	private RID _currRID = null;
@@ -20,7 +19,7 @@ public class FileScan extends Iterator {
 	 */
 	public FileScan(Schema schema, HeapFile file) {
 		_heapFile = file;
-		_schema = schema;		
+		this.schema = schema;		
 		_heapScan = _heapFile.openScan();
 		_bOpen = true;
 	}
@@ -56,6 +55,7 @@ public class FileScan extends Iterator {
 	 * Closes the iterator, releasing any resources (i.e. pinned pages).
 	 */
 	public void close() {
+		_currRID = null;
 		_heapScan.close();
 		_bOpen = false;
 	}
@@ -75,7 +75,7 @@ public class FileScan extends Iterator {
 	public Tuple getNext() throws IllegalStateException{
 		_currRID = new RID();
 		byte[] nextRecordData = _heapScan.getNext(_currRID);
-		Tuple tuple = new Tuple(_schema, nextRecordData);		
+		Tuple tuple = new Tuple(schema, nextRecordData);		
 		
 		return tuple;
 	}
