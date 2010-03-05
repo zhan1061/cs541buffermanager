@@ -30,7 +30,8 @@ public class Selection extends Iterator {
 	 * child iterators, and increases the indent depth along the way.
 	 */
 	public void explain(int depth) {
-		throw new UnsupportedOperationException("Not implemented");
+		indent(depth);		
+		System.out.println("Selection");
 	}
 
 	/**
@@ -54,6 +55,7 @@ public class Selection extends Iterator {
 	 * Closes the iterator, releasing any resources (i.e. pinned pages).
 	 */
 	public void close() {
+		_savedTuple = null;
 		_iter.close();
 		_bOpen = false;
 	}
