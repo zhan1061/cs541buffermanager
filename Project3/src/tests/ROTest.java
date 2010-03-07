@@ -5,6 +5,7 @@ import global.AttrType;
 import global.RID;
 import global.SearchKey;
 import heap.HeapFile;
+import index.BucketScan;
 import index.HashIndex;
 import relop.FileScan;
 import relop.HashJoin;
@@ -71,16 +72,18 @@ class ROTest extends TestDriver {
 		// run all the test cases
 		System.out.println("\n" + "Running " + TEST_NAME + "...");
 		boolean status = PASS;
-		//    status &= rot.test1();
-		//    status &= rot.test2();
-		//    status &= rot.test3();
-		//    status &= rot.test4();
+//		status &= rot.test1();
+//		status &= rot.test2();
+//		status &= rot.test3();
+//		status &= rot.test4();
 //		status &= rot.test5();
 //		status &= rot.test6();
 //		status &= rot.test7();
 //		status &= rot.test8();
-		status &= rot.test9();
-
+//		status &= rot.test9();
+		status &= rot.test10();
+		status &= rot.test11();
+		
 		// display the final results
 		System.out.println();
 		if (status != PASS) {
@@ -814,4 +817,190 @@ class ROTest extends TestDriver {
 		}
 	} // protected boolean test2()
 
+	/**
+	 * Probing HashJoin
+	 * @author anurag
+	 * @return
+	 */
+	protected boolean test10(){
+		boolean status = PASS;
+		System.out.println("\nTest 10: Simple HashJoin test");
+		initCounts();
+		saveCounts(null);
+
+		try{
+			System.out.println("\nTest 2: Hash-based join operator\n");
+			initCounts();
+
+			// create and populate the drivers table
+			saveCounts(null);
+			HeapFile drivers = new HeapFile(null);
+			Tuple tuple = new Tuple(s_drivers);
+			tuple.setAllFields(1, "Ahmed", "Elmagarmid", 25F, 5);
+			tuple.insertIntoFile(drivers);
+			tuple.setAllFields(2, "Walid", "Aref", 27F, 13);
+			tuple.insertIntoFile(drivers);
+			tuple.setAllFields(3, "Christopher", "Clifton", 18F, 4);
+			tuple.insertIntoFile(drivers);
+			tuple.setAllFields(4, "Sunil", "Prabhakar", 22F, 7);
+			tuple.insertIntoFile(drivers);
+			tuple.setAllFields(5, "Elisa", "Bertino", 26F, 5);
+			tuple.insertIntoFile(drivers);
+			tuple.setAllFields(6, "Susanne", "Hambrusch", 26F, 3);
+			tuple.insertIntoFile(drivers);
+			tuple.setAllFields(7, "David", "Eberts", 24F, 8);
+			tuple.insertIntoFile(drivers);
+			tuple.setAllFields(8, "Arif", "Ghafoor", 20F, 5);
+			tuple.insertIntoFile(drivers);
+			tuple.setAllFields(9, "Jeff", "Vitter", 19F, 10);
+			tuple.insertIntoFile(drivers);
+			saveCounts("drivers");
+
+			// create and populate the rides table
+			saveCounts(null);
+			HeapFile rides = new HeapFile(null);
+			tuple = new Tuple(s_rides);
+			tuple.setAllFields(3, 5, "2/10/2006", "2/13/2006");
+			tuple.insertIntoFile(rides);
+			tuple.setAllFields(1, 2, "2/12/2006", "2/14/2006");
+			tuple.insertIntoFile(rides);
+			tuple.setAllFields(9, 1, "2/15/2006", "2/15/2006");
+			tuple.insertIntoFile(rides);
+			tuple.setAllFields(5, 7, "2/14/2006", "2/18/2006");
+			tuple.insertIntoFile(rides);
+			tuple.setAllFields(1, 3, "2/15/2006", "2/16/2006");
+			tuple.insertIntoFile(rides);
+			tuple.setAllFields(2, 6, "2/17/2006", "2/20/2006");
+			tuple.insertIntoFile(rides);
+			tuple.setAllFields(3, 4, "2/18/2006", "2/19/2006");
+			tuple.insertIntoFile(rides);
+			tuple.setAllFields(4, 1, "2/19/2006", "2/19/2006");
+			tuple.insertIntoFile(rides);
+			tuple.setAllFields(2, 7, "2/18/2006", "2/23/2006");
+			tuple.insertIntoFile(rides);
+			tuple.setAllFields(8, 5, "2/20/2006", "2/22/2006");
+			tuple.insertIntoFile(rides);
+			tuple.setAllFields(3, 2, "2/24/2006", "2/26/2006");
+			tuple.insertIntoFile(rides);
+			tuple.setAllFields(6, 6, "2/25/2006", "2/26/2006");
+			tuple.insertIntoFile(rides);
+			saveCounts("rides");
+
+			// test hash join operator
+			saveCounts(null);
+			FileScan fileScan1 = new FileScan(s_drivers, drivers);
+			FileScan fileScan2 = new FileScan(s_rides, rides);
+			
+			HashJoin join = new HashJoin(fileScan1,
+					fileScan2, 0, 0);
+			BucketScan leftBucketScan = join.getLeftBucketScan();			
+			BucketScan rightBucketScan = join.getRightBucketScan();
+			
+			System.out.println("Left BucketScan:");
+			
+			while(leftBucketScan.hasNext()){
+				RID rid = leftBucketScan.getNext();
+				int hash = leftBucketScan.getNextHash(); 
+				
+				System.out.println(rid.toString() + "; Hash: " + hash);				
+			}
+			
+			System.out.println("Right BucketScan:");
+			
+			while(rightBucketScan.hasNext()){
+				RID rid = rightBucketScan.getNext();
+				int hash = rightBucketScan.getNextHash(); 
+				
+				System.out.println(rid.toString() + "; Hash: " + hash);				
+			}
+			
+//			rightBucketScan.close();
+//			leftBucketScan.close();
+			fileScan1.close();
+			fileScan2.close();
+			join.close();
+			
+		}catch(Exception exception){
+			status = FAIL;
+		}
+
+		return status;
+	}
+
+	/**
+	 * Hashjoin with selection test.
+	 * 
+	 * @author anurag 
+	 * @return
+	 */
+	protected boolean test11(){
+		boolean status = PASS;
+
+		System.out.println("\nTest 11: Hashjoin with selection test");
+		initCounts();
+		saveCounts(null);
+
+		// create and populate a temporary Drivers file and index
+		Tuple tuple = new Tuple(s_drivers);
+		HeapFile file = new HeapFile(null);
+		HashIndex index = new HashIndex(null);
+		for (int i = 1; i <= 10; i++) {
+
+			// create the tuple
+			tuple.setIntFld(0, i);
+			tuple.setStringFld(1, "f" + i);
+			tuple.setStringFld(2, "l" + i);
+			Float age = (float) (i * 7);
+			tuple.setFloatFld(3, age);
+			tuple.setIntFld(4, i + 100);
+
+			// insert the tuple in the file and index
+			RID rid = file.insertRecord(tuple.getData());
+			index.insertEntry(new SearchKey(age), rid);
+
+		} // for
+		saveCounts("insert");
+
+		// test selection operator
+		saveCounts(null);
+		System.out.println("\n  ~> test selection (Age > 65 OR Age < 15)...\n");
+		Predicate[] preds = new Predicate[] {
+				new Predicate(AttrOperator.GT, AttrType.FIELDNO, 3, AttrType.FLOAT,	60F),
+				new Predicate(AttrOperator.LT, AttrType.FIELDNO, 3, AttrType.FLOAT, 15F)
+		};		
+		
+		Selection selection1 = new Selection(new FileScan(s_drivers, file), preds);
+		Selection selection2 = new Selection(new FileScan(s_drivers, file), preds);
+		FileScan fileScan1 = new FileScan(s_drivers, file);
+		HashJoin join = new HashJoin(selection1,
+				fileScan1, 0, 0);
+		BucketScan leftBucketScan = join.getLeftBucketScan();			
+		BucketScan rightBucketScan = join.getRightBucketScan();
+		System.out.println("Left BucketScan:");
+		
+		while(leftBucketScan.hasNext()){
+			RID rid = leftBucketScan.getNext();
+			int hash = leftBucketScan.getNextHash(); 
+			
+			System.out.println(rid.toString() + "; Hash: " + hash);				
+		}
+		
+		System.out.println("Right BucketScan:");
+		
+		while(rightBucketScan.hasNext()){
+			RID rid = rightBucketScan.getNext();
+			int hash = rightBucketScan.getNextHash(); 
+			
+			System.out.println(rid.toString() + "; Hash: " + hash);				
+		}
+		
+		selection1.close();
+		selection2.close();
+		fileScan1.close();
+		join.close();
+		saveCounts("join");
+		
+		printSummary(4);
+		return status;
+	}
 } // class ROTest extends TestDriver
