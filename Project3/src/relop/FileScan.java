@@ -9,7 +9,7 @@ import heap.HeapScan;
  * version takes schema into consideration and generates real tuples.
  */
 public class FileScan extends Iterator {
-	private HeapFile _heapFile = null;
+	protected HeapFile _heapFile = null;
 	private HeapScan _heapScan = null;
 	private boolean _bOpen = false;
 	private RID _currRID = null;
