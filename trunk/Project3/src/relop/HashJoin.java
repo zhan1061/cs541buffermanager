@@ -5,6 +5,7 @@ import global.RID;
 import global.SearchKey;
 import heap.HeapFile;
 import index.*;
+
 import java.util.ArrayList;
 
 /**
@@ -23,6 +24,23 @@ public class HashJoin extends Iterator {
 	private static int _lastBucketScanID;
 	private static int _lastHeapFileID;
 	
+	///////// Vinay ///////////////
+	HashTableDup memoryHashTable = new HashTableDup();
+	int position_in_bucket = 0;
+	
+	Tuple innerTuple;
+	Tuple nextTuple;
+	
+	IndexScan outerIndexScan;
+	IndexScan innerIndexScan;
+	
+	int out_column;
+	int in_column;
+	
+	int currentHash;
+	
+	Tuple matchingTuples[] =null;
+	///////// Vinay ///////////////	
 	static{
 		_lastBucketScanID = 0;
 		_lastHeapFileID = 0;
@@ -33,6 +51,16 @@ public class HashJoin extends Iterator {
 	 * columns to match (relative to their individual schemas).
 	 */
 	public HashJoin(Iterator left, Iterator right, Integer lcol, Integer rcol) {
+		///////// Vinay ///////////////	
+		this.out_column = lcol;
+		this.in_column = rcol;
+		schema = Schema.join(left.schema, right.schema);
+		makeIndexScan(true, left, lcol);
+		makeIndexScan(false, right, rcol);
+		
+		///////// Vinay ///////////////	
+		
+		
 		_lcol = lcol;
 		_rcol = rcol;
 
@@ -40,32 +68,82 @@ public class HashJoin extends Iterator {
 		_rightBucketScan = getAppropriateBucketScan(right, rcol);
 	}
 	
+	private IndexScan getIndexScan(Iterator iter, HeapFile heapFile, FileScan iFileScan, int indexKey)
+	{
+		HashIndex hashIndex = new HashIndex(null);
+		while(iFileScan.hasNext()){
+			hashIndex.insertEntry(new SearchKey(iFileScan.getNext().getField(indexKey)), iFileScan.getLastRID());
+		}
+		return new IndexScan(iter.schema, hashIndex, heapFile);
+	}
+	
+	private void makeIndexScan(boolean outer, Iterator iter, int indexKey){
+		HeapFile heapFile=null;
+		IndexScan iScan=null;
+
+		if(iter instanceof IndexScan){
+			iScan=(IndexScan) iter;
+		}
+		else{
+			FileScan iFileScan=null;
+			if(iter instanceof FileScan){
+				iFileScan = (FileScan)iter;
+				heapFile = iFileScan._heapFile;
+				iScan = getIndexScan(iter, heapFile, iFileScan, indexKey);
+			}
+			else{
+				heapFile = new  HeapFile(null);
+				while(iter.hasNext()){
+					heapFile.insertRecord(iter.getNext().data);
+				}
+				iFileScan = new FileScan(iter.schema, heapFile);
+				iScan = getIndexScan(iter, heapFile, iFileScan, indexKey);
+
+			}
+			
+		}
+		if(outer){
+			outerIndexScan=iScan;
+		}
+		else{
+			innerIndexScan=iScan;
+		}
+
+	}//end of makeIndexScan
 	/**
 	 * Gives a one-line explaination of the iterator, repeats the call on any
 	 * child iterators, and increases the indent depth along the way.
 	 */
 	public void explain(int depth) {
-		throw new UnsupportedOperationException("Not implemented");
+		System.out.println("Hash join op....");
+		//outerIndexScan.explain(depth); wht should this be ???
+		//innerIndexScan.explain(depth); ????
 	}
 
 	/**
 	 * Restarts the iterator, i.e. as if it were just constructed.
 	 */
 	public void restart() {
-		throw new UnsupportedOperationException("Not implemented");
+    	innerIndexScan.restart();
+    	outerIndexScan.restart();
 	}
 
 	/**
 	 * Returns true if the iterator is open; false otherwise.
 	 */
 	public boolean isOpen() {
-		throw new UnsupportedOperationException("Not implemented");
+		return (innerIndexScan.isOpen() && outerIndexScan.isOpen());
 	}
 
 	/**
 	 * Closes the iterator, releasing any resources (i.e. pinned pages).
 	 */
 	public void close() {
+		///////// Vinay ///////////////	
+		innerIndexScan.close();
+		outerIndexScan.close();
+		///////// Vinay ///////////////	
+		/*
 		// TODO: Cleanup temp files, temp indices		
 		_leftBucketScan.close();
 		_rightBucketScan.close();
@@ -80,14 +158,77 @@ public class HashJoin extends Iterator {
 		
 		for(HashIndex hashIndex : _lstOpenHashIndices){
 			hashIndex.deleteFile();
-		}			
+		}*/			
+	}
+
+	
+	
+	public void initMemoryHashTable(int hashCode){
+		currentHash = hashCode;
+		outerIndexScan.restart();
+		memoryHashTable.clear();
+		while(outerIndexScan.hasNext() && outerIndexScan.getNextHash() != currentHash){
+			outerIndexScan.getNext();
+		}
+		while(outerIndexScan.getNextHash() == currentHash && outerIndexScan.hasNext() ){
+			//reached the right partition. so now do this:
+			Tuple outerTuple = outerIndexScan.getNext();
+			memoryHashTable.add(new SearchKey(outerTuple.getField(out_column).toString()), outerTuple);
+		}
 	}
 
 	/**
 	 * Returns true if there are more tuples, false otherwise.
 	 */
 	public boolean hasNext() {
-		throw new UnsupportedOperationException("Not implemented");
+		int innerHashValue;
+		int temp = 0;
+		if(matchingTuples!=null){
+			if(position_in_bucket==matchingTuples.length -1){
+				position_in_bucket=0;
+				matchingTuples=null;
+				return hasNext();
+			}
+			else{
+				for(;position_in_bucket < matchingTuples.length; position_in_bucket++){
+					if(innerTuple.getField(in_column).equals(matchingTuples[position_in_bucket].getField(out_column))){
+						nextTuple = Tuple.join(matchingTuples[position_in_bucket++], innerTuple, schema);
+						return true;
+					}
+				}
+				position_in_bucket=0;
+				matchingTuples=null;
+				return hasNext();
+			}
+		}
+		else{
+			innerHashValue=innerIndexScan.getNextHash();
+			if(innerHashValue != currentHash ){
+				initMemoryHashTable(innerHashValue);
+			}
+			if(innerIndexScan.hasNext()){
+				innerTuple=innerIndexScan.getNext();
+				matchingTuples= memoryHashTable.getAll(new SearchKey(innerTuple.getField(in_column).toString()));
+				if(matchingTuples!=null){
+					for(;position_in_bucket < matchingTuples.length; position_in_bucket++){
+						if(innerTuple.getField(in_column).equals(matchingTuples[position_in_bucket].getField(out_column))){
+							nextTuple = Tuple.join(matchingTuples[position_in_bucket++], innerTuple, schema);
+							return true;
+						}
+					}
+					position_in_bucket = 0;
+					matchingTuples = null;
+					return hasNext();
+				}
+				position_in_bucket = 0;
+				matchingTuples = null;
+				return hasNext();
+			}
+			else{
+				matchingTuples = null;
+				return false;
+			}
+		}
 	}
 
 	/**
@@ -96,7 +237,11 @@ public class HashJoin extends Iterator {
 	 * @throws IllegalStateException if no more tuples
 	 */
 	public Tuple getNext() {
-		throw new UnsupportedOperationException("Not implemented");
+		if(nextTuple == null){
+			throw new IllegalStateException("No tuples...");
+		}else{
+			return nextTuple;
+		}
 	}
 	
 	/**
