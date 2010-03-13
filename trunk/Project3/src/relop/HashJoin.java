@@ -24,23 +24,19 @@ public class HashJoin extends Iterator {
 	private static int _lastBucketScanID;
 	private static int _lastHeapFileID;
 	
-	///////// Vinay ///////////////
 	HashTableDup memoryHashTable = new HashTableDup();
 	int position_in_bucket = 0;
 	
 	Tuple innerTuple;
 	Tuple nextTuple;
-	
 	IndexScan outerIndexScan;
 	IndexScan innerIndexScan;
 	
 	int out_column;
 	int in_column;
-	
 	int currentHash;
 	
 	Tuple matchingTuples[] =null;
-	///////// Vinay ///////////////	
 	static{
 		_lastBucketScanID = 0;
 		_lastHeapFileID = 0;
@@ -51,15 +47,11 @@ public class HashJoin extends Iterator {
 	 * columns to match (relative to their individual schemas).
 	 */
 	public HashJoin(Iterator left, Iterator right, Integer lcol, Integer rcol) {
-		///////// Vinay ///////////////	
 		this.out_column = lcol;
 		this.in_column = rcol;
 		schema = Schema.join(left.schema, right.schema);
 		makeIndexScan(true, left, lcol);
-		makeIndexScan(false, right, rcol);
-		
-		///////// Vinay ///////////////	
-		
+		makeIndexScan(false, right, rcol);		
 		
 		_lcol = lcol;
 		_rcol = rcol;
@@ -116,8 +108,8 @@ public class HashJoin extends Iterator {
 	 */
 	public void explain(int depth) {
 		System.out.println("Hash join op....");
-		//outerIndexScan.explain(depth); wht should this be ???
-		//innerIndexScan.explain(depth); ????
+		outerIndexScan.explain(depth+1); 
+		innerIndexScan.explain(depth+1); 
 	}
 
 	/**
@@ -181,10 +173,10 @@ public class HashJoin extends Iterator {
 	 * Returns true if there are more tuples, false otherwise.
 	 */
 	public boolean hasNext() {
-		int innerHashValue;
+		//int innerHashValue;
 		int temp = 0;
 		if(matchingTuples!=null){
-			if(position_in_bucket==matchingTuples.length -1){
+			if(position_in_bucket==matchingTuples.length-1){
 				position_in_bucket=0;
 				matchingTuples=null;
 				return hasNext();
@@ -202,7 +194,7 @@ public class HashJoin extends Iterator {
 			}
 		}
 		else{
-			innerHashValue=innerIndexScan.getNextHash();
+		    int innerHashValue=innerIndexScan.getNextHash();
 			if(innerHashValue != currentHash ){
 				initMemoryHashTable(innerHashValue);
 			}
@@ -228,6 +220,7 @@ public class HashJoin extends Iterator {
 				matchingTuples = null;
 				return false;
 			}
+		  
 		}
 	}
 
