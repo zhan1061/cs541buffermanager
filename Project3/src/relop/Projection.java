@@ -8,25 +8,27 @@ public class Projection extends Iterator {
 	
 	Integer[] fields;
 	Iterator iter;
-	int[] mapping;
+	int[] map;
+	int mapingCnt;
 
   /**
-   * Constructs a projection, given the underlying iator and field numbers.
+   * Constructs a projection, given the underlying and field numbers.
    */
   public Projection(Iterator iter, Integer... fields) {
-	  this.iter = iter;
-	  this.fields = fields;
+	  this.iter=iter;
+	  this.fields=fields;
+	  this.mapingCnt = 0;
+	  schema=new Schema(fields.length);
+	  map=new int[fields.length];
 
-	  schema = new Schema(fields.length);
-	  mapping= new int[fields.length];
-
-	  for(int i=0;i< fields.length; i++ ){
-		  String fieldName = iter.schema.fieldName(fields[i]);
-		  int fieldLength = iter.schema.fieldLength(fields[i]);
-		  int fieldType = iter.schema.fieldType(fields[i]);
-
-		  schema.initField(i, fieldType,fieldLength, fieldName);
-		  mapping[i] = fields[i];
+	  for(int i=0;i<fields.length;i++){
+		  String fName = iter.schema.fieldName(fields[i]);
+		  int fLength = iter.schema.fieldLength(fields[i]);
+		  int fType = iter.schema.fieldType(fields[i]);
+		  int test = 0;
+		  schema.initField(i,fType,fLength,fName);
+		  map[i] = fields[i];
+		  test++;
 	  }
   }
 
@@ -73,13 +75,12 @@ public class Projection extends Iterator {
    */
   public Tuple getNext() {
 	  Tuple projTuple = new Tuple(schema);
-	  int numOfFields = schema.getCount();
+	  int num_of_fields = schema.getCount();
 	  Tuple origTuple = iter.getNext();
-
-	  for(int i=0;i<numOfFields;i++){
-		  projTuple.setField(i, origTuple.getField(mapping[i]));
+	  
+	  for(int i=0;i<num_of_fields;i++){
+		  projTuple.setField(i, origTuple.getField(map[i]));
 	  }
-
       return projTuple;
   }
 

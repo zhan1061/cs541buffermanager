@@ -16,14 +16,16 @@ public class IndexScan extends Iterator {
 	private HeapFile file;
 	
 	
+	
+	
   /**
    * Constructs an index scan, given the hash index and schema.
    */
   public IndexScan(Schema schema, HashIndex index, HeapFile file) {
-	  this.schema = schema;
-	  this.hashIndex = index;
-	  this.file = file;
-	  this.bucketScan = this.hashIndex.openScan();
+	  this.schema=schema;
+	  this.hashIndex=index;
+	  this.file=file;
+	  this.bucketScan=this.hashIndex.openScan();
   }
 
   /**
@@ -31,33 +33,33 @@ public class IndexScan extends Iterator {
    * child iterators, and increases the indent depth along the way.
    */
   public void explain(int depth) {
-	  System.out.println("Index Scan");
+	  System.out.println("Index Scan....");
   }
 
   /**
    * Restarts the iterator, i.e. as if it were just constructed.
    */
   public void restart() {
-	  if(bucketScan != null ){
+	  if(bucketScan!=null ){
 		  bucketScan.close();
 	  }
-	  bucketScan = hashIndex.openScan();
+	  bucketScan=hashIndex.openScan();
   }
 
   /**
    * Returns true if the iterator is open; false otherwise.
    */
   public boolean isOpen() {
-	  return bucketScan != null;
+	  return (bucketScan!=null);
   }
 
   /**
    * Closes the iterator, releasing any resources (i.e. pinned pages).
    */
   public void close() {
-	  if(bucketScan !=null){
+	  if(bucketScan!=null){
 		  bucketScan.close();
-		  bucketScan = null;
+		  bucketScan=null;
 	  }
   }
 
@@ -74,12 +76,12 @@ public class IndexScan extends Iterator {
    * @throws IllegalStateException if no more tuples
    */
   public Tuple getNext() {
-	  RID rid = bucketScan.getNext();
-	  byte [] data = file.selectRecord(rid);
-	  if(data != null){
-		  return new Tuple (schema, data);
+	  RID rid=bucketScan.getNext();
+	  byte []data=file.selectRecord(rid);
+	  if(data!=null){
+		  return new Tuple(schema,data);
 	  }else{
-		  throw new IllegalStateException("No more tuples left");
+		  throw new IllegalStateException("No more tuples left....");
 	  }
   }
 
