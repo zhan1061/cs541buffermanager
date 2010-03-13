@@ -74,23 +74,22 @@ public class HashJoin extends Iterator {
 		IndexScan iScan=null;
 
 		if(iter instanceof IndexScan){
-			iScan=(IndexScan) iter;
+			iScan=(IndexScan)iter;
 		}
 		else{
 			FileScan iFileScan=null;
 			if(iter instanceof FileScan){
 				iFileScan = (FileScan)iter;
 				heapFile = iFileScan._heapFile;
-				iScan = getIndexScan(iter, heapFile, iFileScan, indexKey);
+				iScan = getIndexScan(iter,heapFile, iFileScan, indexKey);
 			}
 			else{
-				heapFile = new  HeapFile(null);
+				heapFile = new HeapFile(null);
 				while(iter.hasNext()){
 					heapFile.insertRecord(iter.getNext().data);
 				}
 				iFileScan = new FileScan(iter.schema, heapFile);
 				iScan = getIndexScan(iter, heapFile, iFileScan, indexKey);
-
 			}
 			
 		}
@@ -108,8 +107,8 @@ public class HashJoin extends Iterator {
 	 */
 	public void explain(int depth) {
 		System.out.println("Hash join op....");
-		outerIndexScan.explain(depth+1); 
-		innerIndexScan.explain(depth+1); 
+		//outerIndexScan.explain(depth); 
+		//innerIndexScan.explain(depth); 
 	}
 
 	/**
@@ -124,7 +123,7 @@ public class HashJoin extends Iterator {
 	 * Returns true if the iterator is open; false otherwise.
 	 */
 	public boolean isOpen() {
-		return (innerIndexScan.isOpen() && outerIndexScan.isOpen());
+		return (innerIndexScan.isOpen()&&outerIndexScan.isOpen());
 	}
 
 	/**
@@ -169,6 +168,15 @@ public class HashJoin extends Iterator {
 		}
 	}
 
+//	public void runloop()
+//	{
+//		for(;position_in_bucket < matchingTuples.length; position_in_bucket++){
+//			if(innerTuple.getField(in_column).equals(matchingTuples[position_in_bucket].getField(out_column))){
+//				nextTuple = Tuple.join(matchingTuples[position_in_bucket++], innerTuple, schema);
+//			}
+//		}
+//	}
+
 	/**
 	 * Returns true if there are more tuples, false otherwise.
 	 */
@@ -182,11 +190,12 @@ public class HashJoin extends Iterator {
 				return hasNext();
 			}
 			else{
-				for(;position_in_bucket < matchingTuples.length; position_in_bucket++){
+				while(position_in_bucket < matchingTuples.length){
 					if(innerTuple.getField(in_column).equals(matchingTuples[position_in_bucket].getField(out_column))){
-						nextTuple = Tuple.join(matchingTuples[position_in_bucket++], innerTuple, schema);
+						nextTuple=Tuple.join(matchingTuples[position_in_bucket++],innerTuple,schema);
 						return true;
 					}
+					position_in_bucket++;
 				}
 				position_in_bucket=0;
 				matchingTuples=null;
@@ -195,29 +204,30 @@ public class HashJoin extends Iterator {
 		}
 		else{
 		    int innerHashValue=innerIndexScan.getNextHash();
-			if(innerHashValue != currentHash ){
+			if(innerHashValue!=currentHash){
 				initMemoryHashTable(innerHashValue);
 			}
 			if(innerIndexScan.hasNext()){
 				innerTuple=innerIndexScan.getNext();
 				matchingTuples= memoryHashTable.getAll(new SearchKey(innerTuple.getField(in_column).toString()));
 				if(matchingTuples!=null){
-					for(;position_in_bucket < matchingTuples.length; position_in_bucket++){
+					while(position_in_bucket < matchingTuples.length){
 						if(innerTuple.getField(in_column).equals(matchingTuples[position_in_bucket].getField(out_column))){
-							nextTuple = Tuple.join(matchingTuples[position_in_bucket++], innerTuple, schema);
+							nextTuple = Tuple.join(matchingTuples[position_in_bucket++],innerTuple,schema);
 							return true;
 						}
+						position_in_bucket++;
 					}
-					position_in_bucket = 0;
-					matchingTuples = null;
+					position_in_bucket=0;
+					matchingTuples=null;
 					return hasNext();
 				}
-				position_in_bucket = 0;
-				matchingTuples = null;
+				position_in_bucket=0;
+				matchingTuples=null;
 				return hasNext();
 			}
 			else{
-				matchingTuples = null;
+				matchingTuples=null;
 				return false;
 			}
 		  
