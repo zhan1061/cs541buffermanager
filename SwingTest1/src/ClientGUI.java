@@ -3,12 +3,16 @@ import java.awt.FlowLayout;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.rmi.registry.LocateRegistry;
+import java.rmi.registry.Registry;
 
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JTabbedPane;
+import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 
@@ -16,11 +20,16 @@ public class ClientGUI extends JPanel {
 
   private JTextField[] fields;
   private JTextField response;
+  boolean canConnect = false;
+  String serverName;
+  String hostName;
+  String port;
+  boolean busy = false;
   
   
   public ClientGUI(String[] labels, int[] widths) {
     super(new BorderLayout());
-    JTabbedPane tab = new JTabbedPane();
+    final JTabbedPane tab = new JTabbedPane();
     
     JPanel connectPanel = new JPanel(new GridLayout(2,3));
     JPanel depositPanel = new JPanel(new GridLayout(2,2));
@@ -67,6 +76,18 @@ public class ClientGUI extends JPanel {
     query.addActionListener(new ActionListener() {
       public void actionPerformed(ActionEvent e) {
         System.out.println(getText(0) + " " + getText(1) + ". " + getText(2));
+        if(("".equals(fields[0].getText().trim()))||("".equals(fields[1].getText().trim()))||("".equals(fields[2].getText().trim())) )
+        {
+        	response.setText("plz enter all the connection details...");
+        }
+        else {
+        canConnect = true;
+        serverName = fields[0].getText().trim();
+        hostName = fields[1].getText().trim();
+    	port = fields[2].getText().trim();
+    	response.setText("all the connection details present. thanks");
+        }
+        
       }
     });
     
@@ -76,6 +97,12 @@ public class ClientGUI extends JPanel {
         	{
         		fields[i].setText("");
         	}
+        	serverName = "";
+        	hostName = "";
+        	port = "";
+        	canConnect = false;
+        	response.setText("cleared details...");
+        	
         }
       });
     responseFieldPanel.add(response);
@@ -83,17 +110,54 @@ public class ClientGUI extends JPanel {
     ////////////////////////////////////////////////
     JPanel createAccountButtonsPanel = new JPanel(new GridLayout(2, 2));
     JButton createAccountButton = new JButton("Create new account");
+    
+//    final JTextField createAccountResponse = new JTextField();
+//    createAccountResponse.setColumns(20);
+//    
+    final JTextArea createAccountResponse = new JTextArea(null, 5, 20);
+    createAccountResponse.setLineWrap(true);
+    JScrollPane createAccountResponseScroll = new JScrollPane(createAccountResponse);
+    createAccountResponseScroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+
     createAccountButton.addActionListener(new ActionListener() {
       public void actionPerformed(ActionEvent e) {
     	  //create a transaction obj
         System.out.println("accnt create button clicked");
+        
+        if(!canConnect)
+        {
+        	createAccountResponse.append("goto Connect to tab and enter connection details first\n");
+        }
+        else if(busy == true){
+        	createAccountResponse.append("try later... system executing another transaction currently\n");
+        }
+        else{
+        	tab.setVisible(false);
+        	busy = true;
+        	createAccountResponse.append("trying to create new account...\n");
+        	
+        	Registry registry;
+    		try {
+    			registry = LocateRegistry.getRegistry(hostName, Integer.parseInt(port));
+    			ITransactionManager remoteTransactionManagerObject = 
+    				(ITransactionManager)registry.lookup(serverName + "_TransactionManager");
+    			
+    			CreateAccountAction createAccountAction = new CreateAccountAction();
+    			Transaction txn1 = remoteTransactionManagerObject.createTransaction(createAccountAction);
+    			remoteTransactionManagerObject.begin(txn1);
+    		} catch (Exception ex) {
+    			// TODO Auto-generated catch block
+    			ex.printStackTrace();
+    		}
+    		busy = false;
+    		tab.setVisible(true);        	
+        }
       }
     });
     createAccountButtonsPanel.add(createAccountButton,BorderLayout.WEST);
     
-    JTextField createAccountResponse = new JTextField();
-    createAccountResponse.setColumns(20);
-    createAccountButtonsPanel.add(createAccountResponse,BorderLayout.EAST);
+    
+    createAccountButtonsPanel.add(createAccountResponseScroll,BorderLayout.EAST);
     createAccountPanel.add(createAccountButtonsPanel, BorderLayout.CENTER);
     
     tab.addTab("Create Account", createAccountPanel);
