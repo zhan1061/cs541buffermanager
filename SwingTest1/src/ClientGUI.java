@@ -145,13 +145,21 @@ public class ClientGUI extends JPanel {
     			CreateAccountAction createAccountAction = new CreateAccountAction();
     			Transaction txn1 = remoteTransactionManagerObject.createTransaction(createAccountAction);
     			remoteTransactionManagerObject.begin(txn1);
+    			//poll to see if txn is complete or not.
+    			while(!txn1.isCompleted())
+    			{
+    				try{
+    					Thread.sleep(500);
+    				}catch(InterruptedException interruptedException){			
+    				}
+    			}
     		} catch (Exception ex) {
     			// TODO Auto-generated catch block
     			ex.printStackTrace();
     		}
     		busy = false;
     		tab.setVisible(true);        	
-        }
+        }//end of else
       }
     });
     createAccountButtonsPanel.add(createAccountButton,BorderLayout.WEST);
