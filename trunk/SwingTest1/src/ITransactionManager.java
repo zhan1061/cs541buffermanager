@@ -7,6 +7,8 @@ public interface ITransactionManager extends Remote{
 	public void begin(Transaction transaction) throws RemoteException;
 	public void operationComplete(IOperation operation) throws RemoteException;
 	public boolean isComplete(Transaction transaction) throws RemoteException;
+	public Transaction getTransactionState(Transaction transaction) throws RemoteException;
+	public void deleteTransaction(Transaction transaction) throws RemoteException, TransactionException;
 	
 	// Locally invocable methods.  
 	public void commit(Transaction transaction) throws RemoteException;
