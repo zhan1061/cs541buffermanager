@@ -108,7 +108,7 @@ public class ClientGUI extends JPanel {
       });
     responseFieldPanel.add(response);
     tab.addTab("Connect To", connectPanel);
-    ////////////////////////////////////////////////
+////////////////////////////////////////////////
     JPanel createAccountButtonsPanel = new JPanel(new GridLayout(2, 2));
     JButton createAccountButton = new JButton("Create new account");
     
@@ -122,70 +122,70 @@ public class ClientGUI extends JPanel {
 
     createAccountButton.addActionListener(new ActionListener() {
       public void actionPerformed(ActionEvent e) {
-    	  //create a transaction obj
+          //create a transaction obj
         System.out.println("accnt create button clicked");
         
         if(!canConnect)
         {
-        	createAccountResponse.append("goto Connect to tab and enter connection details first\n");
+                createAccountResponse.append("goto Connect to tab and enter connection details first\n");
         }
         else if(busy == true){
-        	createAccountResponse.append("try later... system executing another transaction currently\n");
+                createAccountResponse.append("try later... system executing another transaction currently\n");
         }
         else{
-        	tab.setVisible(false);
-        	busy = true;
-        	createAccountResponse.append("trying to create new account...\n");
-        	
-        	Registry registry;
-    		try {
-    			registry = LocateRegistry.getRegistry(hostName, Integer.parseInt(port));
-    			ITransactionManager remoteTransactionManagerObject = 
-    				(ITransactionManager)registry.lookup(serverName + "_TransactionManager");
-    			
-    			CreateAccountAction createAccountAction = new CreateAccountAction();
-    			Transaction txn1 = remoteTransactionManagerObject.createTransaction(createAccountAction);
-    			remoteTransactionManagerObject.begin(txn1);
-    			//poll to see if txn is complete or not.
-    			boolean bTransactionCompleted = false;
-    			
-    			while(true)
-    			{
-    				bTransactionCompleted = remoteTransactionManagerObject.isComplete(txn1);
-    				
-    				if(bTransactionCompleted){
-    					txn1 = remoteTransactionManagerObject.getTransactionState(txn1);    				
-        				remoteTransactionManagerObject.deleteTransaction(txn1);
-        				
-    					break;
-    				}
-    				
-    				try{
-    					Thread.sleep(500);
-    				}catch(Exception interruptedException){			
-    					interruptedException.printStackTrace();
-    					System.out.println("Sleep problem.");
-    				}
-    			}
-    			
-    			if(txn1.getCompleteType() == Transaction.COMMIT_COMPLETE){
-    				lastActionResult = txn1.getActionResults();
-        			String result[] = new String[lastActionResult.size()];
-    				result = lastActionResult.toArray(result);
-    				createAccountResponse.append("Result of this transaction:\n");
-    				for (String i: result)
-    				{
-    					createAccountResponse.append(i +"\n");	
-    				}
-    			}else{
-    				createAccountResponse.append("Transaction aborted.\n");
-    			}
-    		} catch (Exception ex) {
-    			// TODO Auto-generated catch block
-    			ex.printStackTrace();
-    		}
-    		busy = false;
-    		tab.setVisible(true);        	
+                tab.setVisible(false);
+                busy = true;
+                createAccountResponse.append("trying to create new account...\n");
+                
+                Registry registry;
+                try {
+                        registry = LocateRegistry.getRegistry(hostName, Integer.parseInt(port));
+                        ITransactionManager remoteTransactionManagerObject = 
+                                (ITransactionManager)registry.lookup(serverName + "_TransactionManager");
+                        
+                        CreateAccountAction createAccountAction = new CreateAccountAction();
+                        Transaction txn1 = remoteTransactionManagerObject.createTransaction(createAccountAction);
+                        remoteTransactionManagerObject.begin(txn1);
+                        //poll to see if txn is complete or not.
+                        boolean bTransactionCompleted = false;
+                        
+                        while(true)
+                        {
+                                bTransactionCompleted = remoteTransactionManagerObject.isComplete(txn1);
+                                
+                                if(bTransactionCompleted){
+                                        txn1 = remoteTransactionManagerObject.getTransactionState(txn1);                                
+                                        remoteTransactionManagerObject.deleteTransaction(txn1);
+                                        
+                                        break;
+                                }
+                                
+                                try{
+                                        Thread.sleep(500);
+                                }catch(Exception interruptedException){                 
+                                        interruptedException.printStackTrace();
+                                        System.out.println("Sleep problem.");
+                                }
+                        }
+                        
+                        if(txn1.getCompleteType() == Transaction.COMMIT_COMPLETE){
+                                lastActionResult = txn1.getActionResults();
+                                String result[] = new String[lastActionResult.size()];
+                                result = lastActionResult.toArray(result);
+                                createAccountResponse.append("Result of this transaction:\n");
+                                for (String i: result)
+                                {
+                                        createAccountResponse.append(i +"\n");  
+                                }
+                        }else{
+                                createAccountResponse.append("Transaction aborted.\n");
+                        }
+                } catch (Exception ex) {
+                        // TODO Auto-generated catch block
+                        ex.printStackTrace();
+                }
+                busy = false;
+                tab.setVisible(true);           
         }//end of else
       }
     });
@@ -196,7 +196,6 @@ public class ClientGUI extends JPanel {
     createAccountPanel.add(createAccountButtonsPanel, BorderLayout.CENTER);
     
     tab.addTab("Create Account", createAccountPanel);
-    
     ////////////////////////////////////////////////
     JPanel depositDetailsPanel = new JPanel(new GridLayout(1, 2));
     JPanel depositLabelPanel = new JPanel(new GridLayout(2, 1));
@@ -223,6 +222,73 @@ public class ClientGUI extends JPanel {
     depositButton.addActionListener(new ActionListener() {
       public void actionPerformed(ActionEvent e) {
         System.out.println("deposit amt button clicked");
+        if(!canConnect)
+        {
+        	depositResponse.append("goto Connect to tab and enter connection details first\n");
+        }
+        else if(busy == true){
+        	depositResponse.append("try later... system executing another transaction currently\n");
+        }
+//        else if(){
+//        	//for checking if accnt no's branch = connect to branch
+//        }
+        else{
+        	tab.setVisible(false);
+        	busy = true;
+        	depositResponse.append("trying to deposit:$$"+ d_amountField.getText()+ "into account:" +d_accountNoField.getText() +"\n");
+        	
+        	Registry registry;
+    		try {
+    			registry = LocateRegistry.getRegistry(hostName, Integer.parseInt(port));
+    			ITransactionManager remoteTransactionManagerObject = 
+    				(ITransactionManager)registry.lookup(serverName + "_TransactionManager");
+    			
+    			String a = d_accountNoField.getText().trim();
+    			String b[] = a.split(":");
+    			AccountID aid = new AccountID(Integer.parseInt(b[0]),Integer.parseInt(b[1]));
+    			DepositAction depositAction = new DepositAction(aid,Double.parseDouble(d_amountField.getText().trim()));
+    			Transaction txn1 = remoteTransactionManagerObject.createTransaction(depositAction);
+    			remoteTransactionManagerObject.begin(txn1);
+    			//poll to see if txn is complete or not.
+    			boolean bTransactionCompleted = false;
+    			while(true)
+                {
+                        bTransactionCompleted = remoteTransactionManagerObject.isComplete(txn1);
+                        
+                        if(bTransactionCompleted){
+                                txn1 = remoteTransactionManagerObject.getTransactionState(txn1);                                
+                                remoteTransactionManagerObject.deleteTransaction(txn1);
+                                
+                                break;
+                        }
+                        
+                        try{
+                                Thread.sleep(500);
+                        }catch(Exception interruptedException){                 
+                                interruptedException.printStackTrace();
+                                System.out.println("Sleep problem.");
+                        }
+                }
+                
+                if(txn1.getCompleteType() == Transaction.COMMIT_COMPLETE){
+                        lastActionResult = txn1.getActionResults();
+                        String result[] = new String[lastActionResult.size()];
+                        result = lastActionResult.toArray(result);
+                        depositResponse.append("Result of this transaction:\n");
+                        for (String i: result)
+                        {
+                        	depositResponse.append(i +"\n");  
+                        }
+                }else{
+                	depositResponse.append("Transaction aborted.\n");
+                }
+    		} catch (Exception ex) {
+    			// TODO Auto-generated catch block
+    			ex.printStackTrace();
+    		}
+    		busy = false;
+    		tab.setVisible(true);        	
+        }//end of else
       }
     });
     depositPanel.add(depositDetailsPanel,BorderLayout.WEST);
@@ -259,6 +325,74 @@ public class ClientGUI extends JPanel {
     withdrawButton.addActionListener(new ActionListener() {
       public void actionPerformed(ActionEvent e) {
         System.out.println("withdraw amt button clicked");
+        if(!canConnect)
+        {
+        	withdrawResponse.append("goto Connect to tab and enter connection details first\n");
+        }
+        else if(busy == true){
+        	withdrawResponse.append("try later... system executing another transaction currently\n");
+        }
+//        else if(){
+//        	//for checking if accnt no's branch = connect to branch
+//        }
+        else{
+        	tab.setVisible(false);
+        	busy = true;
+        	withdrawResponse.append("trying to withdraw:$$"+ w_amountField.getText()+ "from account:" +w_accountNoField.getText() +"\n");
+        	
+        	Registry registry;
+    		try {
+    			registry = LocateRegistry.getRegistry(hostName, Integer.parseInt(port));
+    			ITransactionManager remoteTransactionManagerObject = 
+    				(ITransactionManager)registry.lookup(serverName + "_TransactionManager");
+    			
+    			String a = w_accountNoField.getText().trim();
+    			String b[] = a.split(":");
+    			AccountID aid = new AccountID(Integer.parseInt(b[0]),Integer.parseInt(b[1]));
+    			WithdrawAction withdrawAction = new WithdrawAction(aid,Double.parseDouble(w_amountField.getText().trim()));
+    			Transaction txn1 = remoteTransactionManagerObject.createTransaction(withdrawAction);
+    			remoteTransactionManagerObject.begin(txn1);
+    			//poll to see if txn is complete or not.
+    			boolean bTransactionCompleted = false;
+    			while(true)
+                {
+                        bTransactionCompleted = remoteTransactionManagerObject.isComplete(txn1);
+                        
+                        if(bTransactionCompleted){
+                                txn1 = remoteTransactionManagerObject.getTransactionState(txn1);                                
+                                remoteTransactionManagerObject.deleteTransaction(txn1);
+                                
+                                break;
+                        }
+                        
+                        try{
+                                Thread.sleep(500);
+                        }catch(Exception interruptedException){                 
+                                interruptedException.printStackTrace();
+                                System.out.println("Sleep problem.");
+                        }
+                }
+                
+                if(txn1.getCompleteType() == Transaction.COMMIT_COMPLETE){
+                        lastActionResult = txn1.getActionResults();
+                        String result[] = new String[lastActionResult.size()];
+                        result = lastActionResult.toArray(result);
+                        withdrawResponse.append("Result of this transaction:\n");
+                        for (String i: result)
+                        {
+                        	withdrawResponse.append(i +"\n");  
+                        }
+                }else{
+                	withdrawResponse.append("Transaction aborted.\n");
+                }
+    		} catch (Exception ex) {
+    			// TODO Auto-generated catch block
+    			ex.printStackTrace();
+    		}
+    		busy = false;
+    		tab.setVisible(true);        	
+        }//end of else
+        
       }
     });
     withdrawPanel.add(withdrawDetailsPanel,BorderLayout.WEST);
@@ -269,10 +403,10 @@ public class ClientGUI extends JPanel {
     withdrawPanel.add(withdrawResponse,BorderLayout.EAST);
 
     tab.addTab("Withdraw $$", withdrawPanel);
-////////////////////////////////////////////////////////
+/////////////////////////////check balance///////////////////////////
     JPanel balanceDetailsPanel = new JPanel(new GridLayout(1, 2));
     
-    JTextField bal_accountNoField = new JTextField();
+    final JTextField bal_accountNoField = new JTextField();
     bal_accountNoField.setColumns(20);
     
     JLabel bal_accountNoLabel = new JLabel("Enter Account No.", JLabel.RIGHT);
@@ -281,20 +415,91 @@ public class ClientGUI extends JPanel {
     balanceDetailsPanel.add(bal_accountNoLabel,BorderLayout.WEST);
     balanceDetailsPanel.add(bal_accountNoField,BorderLayout.EAST);
    
+    final JTextArea balanceResponse = new JTextArea(null, 5, 20);
+    balanceResponse.setLineWrap(true);
+    JScrollPane balanceResponseScroll = new JScrollPane(balanceResponse);
+    balanceResponseScroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+
     JButton balanceButton = new JButton("Check Balance");
     balanceButton.addActionListener(new ActionListener() {
       public void actionPerformed(ActionEvent e) {
         System.out.println("balance button clicked");
+        if(!canConnect)
+        {
+        	balanceResponse.append("goto Connect to tab and enter connection details first\n");
+        }
+        else if(busy == true){
+        	balanceResponse.append("try later... system executing another transaction currently\n");
+        }
+//        else if(){
+//        	//for checking if accnt no's branch = connect to branch
+//        }
+        else{
+        	tab.setVisible(false);
+        	busy = true;
+        	balanceResponse.append("trying to query balance in account:" +bal_accountNoField.getText() +"\n");
+        	
+        	Registry registry;
+    		try {
+    			registry = LocateRegistry.getRegistry(hostName, Integer.parseInt(port));
+    			ITransactionManager remoteTransactionManagerObject = 
+    				(ITransactionManager)registry.lookup(serverName + "_TransactionManager");
+    			
+    			String a = bal_accountNoField.getText().trim();
+    			String b[] = a.split(":");
+    			AccountID aid = new AccountID(Integer.parseInt(b[0]),Integer.parseInt(b[1]));
+    			GetBalanceAction balanceAction = new GetBalanceAction(aid);
+    			Transaction txn1 = remoteTransactionManagerObject.createTransaction(balanceAction);
+    			remoteTransactionManagerObject.begin(txn1);
+    			//poll to see if txn is complete or not.
+    			boolean bTransactionCompleted = false;
+    			while(true)
+                {
+                        bTransactionCompleted = remoteTransactionManagerObject.isComplete(txn1);
+                        
+                        if(bTransactionCompleted){
+                                txn1 = remoteTransactionManagerObject.getTransactionState(txn1);                                
+                                remoteTransactionManagerObject.deleteTransaction(txn1);
+                                
+                                break;
+                        }
+                        
+                        try{
+                                Thread.sleep(500);
+                        }catch(Exception interruptedException){                 
+                                interruptedException.printStackTrace();
+                                System.out.println("Sleep problem.");
+                        }
+                }
+                
+                if(txn1.getCompleteType() == Transaction.COMMIT_COMPLETE){
+                        lastActionResult = txn1.getActionResults();
+                        String result[] = new String[lastActionResult.size()];
+                        result = lastActionResult.toArray(result);
+                        balanceResponse.append("Result of this transaction:\n");
+                        for (String i: result)
+                        {
+                        	balanceResponse.append(i +"\n");  
+                        }
+                }else{
+                	balanceResponse.append("Transaction aborted.\n");
+                }
+    		} catch (Exception ex) {
+    			// TODO Auto-generated catch block
+    			ex.printStackTrace();
+    		}
+    		busy = false;
+    		tab.setVisible(true);        	
+        }//end of else
+       
       }
     });
     balancePanel.add(balanceDetailsPanel,BorderLayout.WEST);
     balancePanel.add(balanceButton,BorderLayout.WEST);
     
-    JTextField balanceResponse = new JTextField();
-    balanceResponse.setColumns(20);
-    balancePanel.add(balanceResponse,BorderLayout.WEST);
+    balancePanel.add(balanceResponseScroll,BorderLayout.WEST);
     tab.addTab("Check Balance", balancePanel);
-    /////////////////////////////////////////////////////
+    //////////////////////////transfer///////////////////////////
     JPanel transferDetailsPanel = new JPanel(new GridLayout(1, 2));
     JPanel transferLabelPanel = new JPanel(new GridLayout(3, 1));
     JPanel transferFieldPanel = new JPanel(new GridLayout(3, 1));
