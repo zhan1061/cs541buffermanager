@@ -513,9 +513,9 @@ public class ClientGUI extends JPanel {
     JPanel transferLabelPanel = new JPanel(new GridLayout(3, 1));
     JPanel transferFieldPanel = new JPanel(new GridLayout(3, 1));
 
-    JTextField t_fromaccountNoField = new JTextField();
-    JTextField t_toaccountNoField = new JTextField();
-    JTextField t_amountField = new JTextField();
+    final JTextField t_fromaccountNoField = new JTextField();
+    final JTextField t_toaccountNoField = new JTextField();
+    final JTextField t_amountField = new JTextField();
     t_fromaccountNoField.setColumns(20);
     t_fromaccountNoField.setColumns(20);
     t_amountField.setColumns(20);
@@ -536,18 +536,94 @@ public class ClientGUI extends JPanel {
     transferDetailsPanel.add(transferLabelPanel,BorderLayout.WEST);
     transferDetailsPanel.add(transferFieldPanel,BorderLayout.EAST);
     
+    final JTextArea transferResponse = new JTextArea(null, 5, 20);
+    transferResponse.setLineWrap(true);
+    JScrollPane transferResponseScroll = new JScrollPane(transferResponse);
+    transferResponseScroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+
     JButton transferButton = new JButton("transfer Amount");
     transferButton.addActionListener(new ActionListener() {
       public void actionPerformed(ActionEvent e) {
         System.out.println("transfer amt button clicked");
+        if(!canConnect)
+        {
+        	transferResponse.append("goto Connect to tab and enter connection details first\n");
+        }
+        else if(busy == true){
+        	transferResponse.append("try later... system executing another transaction currently\n");
+        }
+//        else if(){
+//        	//for checking if accnt no's branch = connect to branch
+//        }
+        else{
+        	tab.setVisible(false);
+        	busy = true;
+        	transferResponse.append("trying to transfer amount: $" + t_amountField.getText() + " from account:" +t_fromaccountNoField.getText() +" to account:" +t_toaccountNoField.getText() + "\n");
+        	
+        	Registry registry;
+    		try {
+    			registry = LocateRegistry.getRegistry(hostName, Integer.parseInt(port));
+    			ITransactionManager remoteTransactionManagerObject = 
+    				(ITransactionManager)registry.lookup(serverName + "_TransactionManager");
+    			
+    			String a1 = t_fromaccountNoField.getText().trim();
+    			String b1[] = a1.split(":");
+    			AccountID from_aid = new AccountID(Integer.parseInt(b1[0]),Integer.parseInt(b1[1]));
+    			String a2 = t_toaccountNoField.getText().trim();
+    			String b2[] = a2.split(":");
+    			AccountID to_aid = new AccountID(Integer.parseInt(b2[0]),Integer.parseInt(b2[1]));
+    			
+    			
+    			TransferAction transferAction = new TransferAction(from_aid,to_aid,Double.parseDouble(t_amountField.getText().trim()));
+    			Transaction txn1 = remoteTransactionManagerObject.createTransaction(transferAction);
+    			remoteTransactionManagerObject.begin(txn1);
+    			//poll to see if txn is complete or not.
+    			boolean bTransactionCompleted = false;
+    			while(true)
+                {
+                        bTransactionCompleted = remoteTransactionManagerObject.isComplete(txn1);
+                        
+                        if(bTransactionCompleted){
+                                txn1 = remoteTransactionManagerObject.getTransactionState(txn1);                                
+                                remoteTransactionManagerObject.deleteTransaction(txn1);
+                                
+                                break;
+                        }
+                        
+                        try{
+                                Thread.sleep(500);
+                        }catch(Exception interruptedException){                 
+                                interruptedException.printStackTrace();
+                                System.out.println("Sleep problem.");
+                        }
+                }
+                
+                if(txn1.getCompleteType() == Transaction.COMMIT_COMPLETE){
+                        lastActionResult = txn1.getActionResults();
+                        String result[] = new String[lastActionResult.size()];
+                        result = lastActionResult.toArray(result);
+                        transferResponse.append("Result of this transaction:\n");
+                        for (String i: result)
+                        {
+                        	transferResponse.append(i +"\n");  
+                        }
+                }else{
+                	transferResponse.append("Transaction aborted.\n");
+                }
+    		} catch (Exception ex) {
+    			// TODO Auto-generated catch block
+    			ex.printStackTrace();
+    		}
+    		busy = false;
+    		tab.setVisible(true);        	
+        }//end of else
+       
       }
     });
     transferPanel.add(transferDetailsPanel,BorderLayout.WEST);
     transferPanel.add(transferButton,BorderLayout.WEST);
     
-    JTextField transferResponse = new JTextField();
-    transferResponse.setColumns(20);
-    transferPanel.add(transferResponse,BorderLayout.WEST);
+    transferPanel.add(transferResponseScroll,BorderLayout.WEST);
     tab.addTab("Transfer $$", transferPanel);
 /////////////////////////////////////////////////////////////////////
     
