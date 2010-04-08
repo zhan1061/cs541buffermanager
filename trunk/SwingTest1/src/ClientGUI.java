@@ -147,13 +147,25 @@ public class ClientGUI extends JPanel {
     			Transaction txn1 = remoteTransactionManagerObject.createTransaction(createAccountAction);
     			remoteTransactionManagerObject.begin(txn1);
     			//poll to see if txn is complete or not.
-    			while(remoteTransactionManagerObject.isComplete(txn1))
+    			boolean bTransactionCompleted = false;
+    			while(true)
     			{
+    				bTransactionCompleted = remoteTransactionManagerObject.isComplete(txn1);
+    				txn1 = remoteTransactionManagerObject.getTransactionState(txn1);
+    				
+    				if(bTransactionCompleted){
+    					break;
+    				}
+    				
     				try{
     					Thread.sleep(500);
-    				}catch(InterruptedException interruptedException){			
+    				}catch(Exception interruptedException){			
+    					interruptedException.printStackTrace();
+    					System.out.println("Sleep problem.");
     				}
     			}
+    			
+    			createAccountResponse.append("Status: " + bTransactionCompleted);
     			lastActionResult = txn1.getActionResults();
     			String result[] = new String[lastActionResult.size()];
     			result = lastActionResult.toArray(result);
