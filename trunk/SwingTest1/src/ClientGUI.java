@@ -5,6 +5,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
+import java.util.ArrayList;
 
 import javax.swing.JButton;
 import javax.swing.JFrame;
@@ -25,7 +26,7 @@ public class ClientGUI extends JPanel {
   String hostName;
   String port;
   boolean busy = false;
-  
+  private ArrayList <String> lastActionResult = new ArrayList<String>();  
   
   public ClientGUI(String[] labels, int[] widths) {
     super(new BorderLayout());
@@ -152,6 +153,14 @@ public class ClientGUI extends JPanel {
     					Thread.sleep(500);
     				}catch(InterruptedException interruptedException){			
     				}
+    			}
+    			lastActionResult = txn1.getActionResults();
+    			String result[] = new String[lastActionResult.size()];
+    			result = lastActionResult.toArray(result);
+    			createAccountResponse.append("Result of this transaction:\n");
+    			for (String i: result)
+    			{
+    				createAccountResponse.append(i +"\n");	
     			}
     		} catch (Exception ex) {
     			// TODO Auto-generated catch block
