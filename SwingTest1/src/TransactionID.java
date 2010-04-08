@@ -28,6 +28,10 @@ public class TransactionID implements Serializable{
 		return _localTransactionNumber;
 	}
 	
+	public String toString(){
+		return "TID[" + _peerID + ":" + _localTransactionNumber + "]";
+	}
+	
 	public boolean equals(Object object){
 		if(!(object instanceof TransactionID)){
 			return false;

@@ -1,19 +1,30 @@
 
-public class CommitOperation extends Operation {
-	private AccountID _accountID;
-	private Transaction _parenTransaction;
+public class CommitOperation implements IOperation {
+	private Transaction _parentTransaction;
+	private int _targetServerID = -1;
 	
-	public CommitOperation(AccountID accountID, Transaction parentTransaction){
-		_accountID = accountID;
-		_parenTransaction = parentTransaction;
-	}
-	
-	public AccountID getAccountID(){
-		return _accountID;
+	public CommitOperation(Transaction parentTransaction){
+		_parentTransaction = parentTransaction;
 	}
 	
 	@Override
 	public Transaction getParentTransaction() {
-		return _parenTransaction;
+		return _parentTransaction;
+	}
+
+	@Override
+	public int getTargetServerID() {
+		return _targetServerID;
+	}
+
+	@Override
+	public int getSourceServerID() {
+		// Grab originating server ID from the parent transaction.
+		return _parentTransaction.getOriginatingServerID();
+	}
+
+	@Override
+	public void setTargetServerID(int targetServerID) {
+		_targetServerID = targetServerID;		
 	}
 }

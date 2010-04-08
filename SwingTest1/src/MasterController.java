@@ -4,7 +4,7 @@ import java.io.FileReader;
 import java.util.ArrayList;
 
 
-public class MasterController implements IPeerEventListener{
+public class MasterController implements IPeerEventListener, ITransactionEventListener, ISchedulerEventListener{
 	IPeerMonitor _peerMonitor = null;
 	IUserInteractionHandler _uiHandler = null;
 	int _registryPort = 0;
@@ -14,6 +14,8 @@ public class MasterController implements IPeerEventListener{
 		_uiHandler = new ServerFrame("Server - " + serviceName);
 		_uiHandler.addPeerEventListener(this);
 		_serviceName = serviceName;
+		
+		GlobalState.set("uiHandler", _uiHandler);
 		
 		// Read the servers.txt file if it exists to get the list of peers.
 		ArrayList<Peer> lstPeer = getPeersFromFile("servers.txt");
@@ -37,9 +39,11 @@ public class MasterController implements IPeerEventListener{
 		
 		Thread heartBeatServerThread = new Thread(new HeartBeatServerThread());
 		Thread transactionManagerServerThread = new Thread(new TransactionManagerServerThread());
+		Thread schedulerServerThread = new Thread(new SchedulerServerThread());
 		
 		heartBeatServerThread.start();
 		transactionManagerServerThread.start();
+		schedulerServerThread.start();
 		
 		// Start PeerMonitor.		
 		_peerMonitor.startMonitor();
@@ -65,6 +69,9 @@ public class MasterController implements IPeerEventListener{
 				String peerName = arrServerLineComponent[1].trim();
 				String peerHostName = arrServerLineComponent[2].trim();
 				int peerPortNumber = Integer.parseInt(arrServerLineComponent[3].trim());
+				
+				PeerIDKeyedMap.insertPeer(new Peer(peerName, peerHostName, peerPortNumber, peerID));
+				PeerNameKeyedMap.insertPeer(new Peer(peerName, peerHostName, peerPortNumber, peerID));
 				
 				if(peerName.equals(_serviceName) == false){
 					lstPeer.add(new Peer(peerName, peerHostName, peerPortNumber, peerID));
@@ -120,13 +127,41 @@ public class MasterController implements IPeerEventListener{
 		public void run() {
 			// Start TransactionManagerServer.
 			try{
-				TransactionManagerServer transactionManagerServer = new TransactionManagerServer(_serviceName, _registryPort);
+				TransactionManagerServer transactionManagerServer = 
+					new TransactionManagerServer(_serviceName, _registryPort,
+							MasterController.this);
 				
 				_uiHandler.appendLog("Local TransactionManager service registered.");
 			}catch(Exception exception){
-				// HeartBeat server start failure.
+				// TransactionManager server start failure.
 				_uiHandler.appendLog("Error occurred while attempting to start TransactionManagerServer: " + exception.getMessage());		
 			}
 		}		
+	}
+	
+	class SchedulerServerThread implements Runnable{
+		@Override
+		public void run() {
+			// Start SchedulerServer.
+			try{
+				SchedulerServer schedulerServer = new SchedulerServer(_serviceName, _registryPort, 
+						MasterController.this);
+				
+				_uiHandler.appendLog("Local Scheduler service registered.");
+			}catch(Exception exception){
+				// Scheduler server start failure.
+				_uiHandler.appendLog("Error occurred while attempting to start SchedulerServer: " + exception.getMessage());		
+			}
+		}		
+	}
+
+	@Override
+	public void transactionEventOccurred(TransactionEvent transactionEvent) {
+		_uiHandler.appendLog(transactionEvent.getTransaction().toString()+ " - " + transactionEvent.getMessage());		
+	}
+
+	@Override
+	public void schedulerEventOccurred(SchedulerEvent schedulerEvent) {
+		_uiHandler.appendLog(schedulerEvent.getMessage());		
 	}
 }

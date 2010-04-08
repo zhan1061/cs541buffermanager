@@ -4,7 +4,7 @@ import java.util.ArrayList;
 public class GetBalanceAction implements IAction, Serializable {
 	private AccountID _accountID;
 	private Transaction _parentTransaction;
-	private ArrayList<Operation> _lstOperation = null;
+	private ArrayList<IOperation> _lstOperation = null;
 	
 	public GetBalanceAction(ArrayList lstArgs){
 		// Just get the accountID from the argument list.
@@ -17,9 +17,9 @@ public class GetBalanceAction implements IAction, Serializable {
 		_accountID = accountID;		
 	}
 	
-	public ArrayList<Operation> getOperations(){
+	public ArrayList<IOperation> getOperations(){
 		if(_lstOperation == null){
-			_lstOperation = new ArrayList<Operation>();
+			_lstOperation = new ArrayList<IOperation>();
 			
 			// This is just one read operation.
 			ReadOperation readOperation1 = new ReadOperation(_accountID, _parentTransaction);
