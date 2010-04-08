@@ -196,13 +196,13 @@ public class ClientGUI extends JPanel {
     createAccountPanel.add(createAccountButtonsPanel, BorderLayout.CENTER);
     
     tab.addTab("Create Account", createAccountPanel);
-    ////////////////////////////////////////////////
+    ///////////////////////deposit/////////////////////////
     JPanel depositDetailsPanel = new JPanel(new GridLayout(1, 2));
     JPanel depositLabelPanel = new JPanel(new GridLayout(2, 1));
     JPanel depositFieldPanel = new JPanel(new GridLayout(2, 1));
 
-    JTextField d_accountNoField = new JTextField();
-    JTextField d_amountField = new JTextField();
+    final JTextField d_accountNoField = new JTextField();
+    final JTextField d_amountField = new JTextField();
     d_accountNoField.setColumns(20);
     d_amountField.setColumns(20);
     
@@ -218,6 +218,11 @@ public class ClientGUI extends JPanel {
     depositDetailsPanel.add(depositLabelPanel,BorderLayout.WEST);
     depositDetailsPanel.add(depositFieldPanel,BorderLayout.EAST);
     
+    final JTextArea depositResponse = new JTextArea(null, 5, 20);
+    depositResponse.setLineWrap(true);
+    JScrollPane depositResponseScroll = new JScrollPane(depositResponse);
+    depositResponseScroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+
     JButton depositButton = new JButton("Deposit Amount");
     depositButton.addActionListener(new ActionListener() {
       public void actionPerformed(ActionEvent e) {
@@ -290,22 +295,23 @@ public class ClientGUI extends JPanel {
     		tab.setVisible(true);        	
         }//end of else
       }
+    
     });
     depositPanel.add(depositDetailsPanel,BorderLayout.WEST);
     depositPanel.add(depositButton,BorderLayout.SOUTH);
     
-    JTextField depositResponse = new JTextField();
-    depositResponse.setColumns(20);
-    depositPanel.add(depositResponse,BorderLayout.EAST);
+//    JTextField depositResponse = new JTextField();
+//    depositResponse.setColumns(20);
+    depositPanel.add(depositResponseScroll,BorderLayout.EAST);
     tab.addTab("Deposit $$", depositPanel);
         
-    //////////////////////////////////////////////////
+    ////////////////////////withdraw//////////////////////////
     JPanel withdrawDetailsPanel = new JPanel(new GridLayout(1, 2));
     JPanel withdrawLabelPanel = new JPanel(new GridLayout(2, 1));
     JPanel withdrawFieldPanel = new JPanel(new GridLayout(2, 1));
 
-    JTextField w_accountNoField = new JTextField();
-    JTextField w_amountField = new JTextField();
+    final JTextField w_accountNoField = new JTextField();
+    final JTextField w_amountField = new JTextField();
     w_accountNoField.setColumns(20);
     w_amountField.setColumns(20);
     
@@ -321,6 +327,11 @@ public class ClientGUI extends JPanel {
     withdrawDetailsPanel.add(withdrawLabelPanel,BorderLayout.WEST);
     withdrawDetailsPanel.add(withdrawFieldPanel,BorderLayout.EAST);
     
+    final JTextArea withdrawResponse = new JTextArea(null, 5, 20);
+    withdrawResponse.setLineWrap(true);
+    JScrollPane withdrawResponseScroll = new JScrollPane(withdrawResponse);
+    withdrawResponseScroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+
     JButton withdrawButton = new JButton("Withdraw Amount");
     withdrawButton.addActionListener(new ActionListener() {
       public void actionPerformed(ActionEvent e) {
@@ -398,9 +409,7 @@ public class ClientGUI extends JPanel {
     withdrawPanel.add(withdrawDetailsPanel,BorderLayout.WEST);
     withdrawPanel.add(withdrawButton,BorderLayout.SOUTH);
     
-    JTextField withdrawResponse = new JTextField();
-    withdrawResponse.setColumns(20);
-    withdrawPanel.add(withdrawResponse,BorderLayout.EAST);
+    withdrawPanel.add(withdrawResponseScroll,BorderLayout.EAST);
 
     tab.addTab("Withdraw $$", withdrawPanel);
 /////////////////////////////check balance///////////////////////////
