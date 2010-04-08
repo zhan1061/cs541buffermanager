@@ -146,7 +146,7 @@ public class ClientGUI extends JPanel {
     			Transaction txn1 = remoteTransactionManagerObject.createTransaction(createAccountAction);
     			remoteTransactionManagerObject.begin(txn1);
     			//poll to see if txn is complete or not.
-    			while(!txn1.isCompleted())
+    			while(remoteTransactionManagerObject.isComplete(txn1))
     			{
     				try{
     					Thread.sleep(500);
