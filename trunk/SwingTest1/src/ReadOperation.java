@@ -1,9 +1,9 @@
 
-public class ReadOperation extends Operation{
+public class ReadOperation implements IOperation{
 	private AccountID _accountID;
 	private double _result;
 	private Transaction _parentTransaction;
-	
+		
 	public ReadOperation(AccountID accountID, Transaction parentTransaction){
 		_accountID = accountID;
 		_parentTransaction = parentTransaction;
@@ -28,4 +28,21 @@ public class ReadOperation extends Operation{
 	public Transaction getParentTransaction(){
 		return _parentTransaction;
 	}
+
+	public int getTargetServerID() {
+		return _accountID.getPeerID();
+	}
+
+	@Override
+	public int getSourceServerID() {
+		// Grab originating server ID from the parent transaction.
+		return _parentTransaction.getOriginatingServerID();
+	}
+
+	@Override
+	public void setTargetServerID(int targetServerID) {
+		// TODO Auto-generated method stub
+		
+	}
+
 }

@@ -64,5 +64,7 @@ public class Peer {
 		return _peerID;
 	}
 	
-	
+	public String toString(){
+		return _peerName + "(" + _peerID + ")" + "@" + _peerHostname + ":" + _peerPortNumber;
+	}
 }

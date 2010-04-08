@@ -21,9 +21,23 @@ public class PeerIDKeyedMap {
 	 */
 	public static void insertPeer(Peer peer) throws InvalidPeerException{
 		if(_htIDPeer.containsKey(peer.getPeerID())){
-			throw new InvalidPeerException("Duplicate peer ID.");
+			throw new InvalidPeerException("Duplicate peer ID. : " + peer.getPeerID() + ";" + peer.getPeerName());
 		}else{
 			_htIDPeer.put(peer.getPeerID(), peer);			
 		}		
+	}
+	
+	/**
+	 * Returns the peer given the ID.
+	 * @param peerID
+	 * @return
+	 * @throws InvalidPeerException
+	 */
+	public static Peer getPeer(int peerID) throws InvalidPeerException{
+		if(_htIDPeer.containsKey(peerID) == false){
+			throw new InvalidPeerException("Peer doesn't exist.");
+		}else{
+			return _htIDPeer.get(peerID);
+		}
 	}
 }

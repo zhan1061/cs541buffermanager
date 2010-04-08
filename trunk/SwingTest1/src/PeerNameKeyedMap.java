@@ -26,4 +26,18 @@ public class PeerNameKeyedMap {
 			_htNamePeer.put(peer.getPeerName(), peer);			
 		}		
 	}
+	
+	/**
+	 * Returns the peer given the name.
+	 * @param peerName
+	 * @return
+	 * @throws InvalidPeerException
+	 */
+	public static Peer getPeer(String peerName) throws InvalidPeerException{
+		if(_htNamePeer.containsKey(peerName) == false){
+			throw new InvalidPeerException("Peer doesn't exist.");
+		}else{
+			return _htNamePeer.get(peerName);
+		}
+	}
 }

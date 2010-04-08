@@ -1,5 +1,5 @@
 
-public class CreateAccountOperation extends Operation {
+public class CreateAccountOperation implements IOperation {
 	private int _peerID;
 	private AccountID _resultAccountID;
 	private Transaction _parentTransaction;
@@ -21,11 +21,32 @@ public class CreateAccountOperation extends Operation {
 		_resultAccountID = accountID;
 	}
 	
+	public AccountID getAccountID(){
+		return _resultAccountID;
+	}
+	
 	public String toString(){
 		return "Create account"; 
 	}
 	
 	public Transaction getParentTransaction(){
 		return _parentTransaction;
+	}
+
+	@Override
+	public int getTargetServerID() {
+		return _peerID;
+	}
+
+	@Override
+	public int getSourceServerID() {
+		// Grab originating server ID from the parent transaction.
+		return _parentTransaction.getOriginatingServerID();
+	}
+
+	@Override
+	public void setTargetServerID(int targetServerID) {
+		// TODO Auto-generated method stub
+		
 	}
 }

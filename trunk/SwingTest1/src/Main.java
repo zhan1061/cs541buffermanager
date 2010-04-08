@@ -11,7 +11,6 @@ public class Main {
 		if(args.length != 1){
 			System.out.println("Usage: java Main <service_name>");
 		}else{		
-//			int registryPort = Integer.parseInt(args[1]); 
 			MasterController masterController = new MasterController(args[0]);
 		}
 		

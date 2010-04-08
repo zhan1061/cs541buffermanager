@@ -1,4 +1,4 @@
 
 public interface IOperationCompletedEventHandler {
-	public void operationCompleted(Operation operation);
+	public void operationCompleted(IOperation operation);
 }
