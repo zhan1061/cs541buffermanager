@@ -86,9 +86,8 @@ public class TransactionManager implements ITransactionManager, ITransactionEven
 	 */
 	public boolean isComplete(Transaction transaction) throws RemoteException {
 		for(Transaction activeTransaction : _lstActiveTransaction){
-			System.out.println("Checking");
 			if(activeTransaction.equals(transaction)){
-				System.out.println("Txn found.");
+//				System.out.println("Txn found.");
 				if(activeTransaction.isComplete()){
 					// Transfer results!!!
 					transaction.markComplete(activeTransaction.getCompleteType());
@@ -98,14 +97,13 @@ public class TransactionManager implements ITransactionManager, ITransactionEven
 						System.out.println(result);
 					}
 					
-					System.out.println("Returning true!!!");
+//					System.out.println("Returning true!!!");
 					
 					return true;
 				}else{
-					System.out.println("Returning false!!!");
+//					System.out.println("Returning false!!!");
 					return false;
-				}
-				
+				}				
 			}
 		}		
 		
@@ -127,8 +125,9 @@ public class TransactionManager implements ITransactionManager, ITransactionEven
 		// Removes this transaction from the list of active transaction.
 		// If the transaction hasn't completed, a TransactionException will
 		// be thrown.
-		if(transaction.isComplete()){			
-			 _lstActiveTransaction.remove(transaction);
+		if(transaction.isComplete()){
+			logTransactionEvent(transaction, "Cleaned up.");
+			_lstActiveTransaction.remove(transaction);
 		}else{
 			throw new TransactionException("Attempt to delete incomplete transaction.");
 		}
@@ -168,10 +167,6 @@ public class TransactionManager implements ITransactionManager, ITransactionEven
 							activeTransaction.markComplete(operation.getParentTransaction().getCompleteType());
 						}
 					}
-					
-//					for(String result : operation.getParentTransaction().getActionResults()){
-//						System.out.println(result);
-//					}
 				} catch (Exception exception) {
 					logTransactionEvent(operation.getParentTransaction(), "Results not obtained.");
 				}

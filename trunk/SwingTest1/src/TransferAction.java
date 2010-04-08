@@ -1,7 +1,7 @@
 import java.util.ArrayList;
 
 
-public class TransferAction {
+public class TransferAction implements IAction{
 	private AccountID _fromAccountID;
 	private AccountID _toAccountID;
 	private Transaction _parentTransaction;
