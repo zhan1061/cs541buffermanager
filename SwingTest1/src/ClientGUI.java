@@ -148,12 +148,15 @@ public class ClientGUI extends JPanel {
     			remoteTransactionManagerObject.begin(txn1);
     			//poll to see if txn is complete or not.
     			boolean bTransactionCompleted = false;
+    			
     			while(true)
     			{
     				bTransactionCompleted = remoteTransactionManagerObject.isComplete(txn1);
-    				txn1 = remoteTransactionManagerObject.getTransactionState(txn1);
     				
     				if(bTransactionCompleted){
+    					txn1 = remoteTransactionManagerObject.getTransactionState(txn1);    				
+        				remoteTransactionManagerObject.deleteTransaction(txn1);
+        				
     					break;
     				}
     				
@@ -165,14 +168,17 @@ public class ClientGUI extends JPanel {
     				}
     			}
     			
-    			createAccountResponse.append("Status: " + bTransactionCompleted);
-    			lastActionResult = txn1.getActionResults();
-    			String result[] = new String[lastActionResult.size()];
-    			result = lastActionResult.toArray(result);
-    			createAccountResponse.append("Result of this transaction:\n");
-    			for (String i: result)
-    			{
-    				createAccountResponse.append(i +"\n");	
+    			if(txn1.getCompleteType() == Transaction.COMMIT_COMPLETE){
+    				lastActionResult = txn1.getActionResults();
+        			String result[] = new String[lastActionResult.size()];
+    				result = lastActionResult.toArray(result);
+    				createAccountResponse.append("Result of this transaction:\n");
+    				for (String i: result)
+    				{
+    					createAccountResponse.append(i +"\n");	
+    				}
+    			}else{
+    				createAccountResponse.append("Transaction aborted.\n");
     			}
     		} catch (Exception ex) {
     			// TODO Auto-generated catch block

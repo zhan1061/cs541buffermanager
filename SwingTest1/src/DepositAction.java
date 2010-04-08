@@ -1,6 +1,6 @@
 import java.util.ArrayList;
 
-public class DepositAction {
+public class DepositAction implements IAction{
 	private AccountID _accountID;
 	private Transaction _parentTransaction;
 	private ArrayList<IOperation> _lstOperation = null;
