@@ -14,6 +14,7 @@ public class Transaction implements Serializable{
 	private boolean _bCompleted;
 	private ArrayList <String> _lstActionResult = null;
 	private int _completeType = NOT_COMPLETE;
+	private int _totalTargetServers = 0;	
 	
 	public Transaction(int peerID, IAction action){
 		_action = action;
@@ -23,6 +24,7 @@ public class Transaction implements Serializable{
 		_lstOperations = _action.getOperations();
 		_lstActionResult = new ArrayList<String>();
 		_bCompleted = false;
+		setTotalTargetServers(0);
 	}
 	
 	/**
@@ -78,5 +80,13 @@ public class Transaction implements Serializable{
 	 */
 	public int getOriginatingServerID(){
 		return _peerID;
+	}
+
+	public void setTotalTargetServers(int totalTargetServers) {
+		this._totalTargetServers = totalTargetServers;
+	}
+
+	public int getTotalTargetServers() {
+		return _totalTargetServers;
 	}
 }
