@@ -11,10 +11,12 @@ public class TransactionManager implements ITransactionManager, ITransactionEven
 	private ComparisonTable <Transaction, TransactionFrame> _htTransactionController;
 	private ArrayList<Transaction> _lstActiveTransaction;
 	private ITransactionEventListener _transactionEventListener = null;
+	private ComparisonTable<Transaction, Integer> _htTransactionCommitsReceived;
 	
 	public TransactionManager(){
 		_htTransactionController = new ComparisonTable<Transaction, TransactionFrame>();
 		_lstActiveTransaction = new ArrayList<Transaction>();
+		_htTransactionCommitsReceived = new ComparisonTable<Transaction, Integer>();
 	}
 	
 	/**
@@ -70,12 +72,18 @@ public class TransactionManager implements ITransactionManager, ITransactionEven
 			IScheduler schedulerRemoteObj = (IScheduler)registry.lookup(peer.getPeerName() + "_Scheduler");
 			
 			schedulerRemoteObj.schedule(operation);			
-		}catch(RemoteException remoteException){			
-			remoteException.printStackTrace();
+		}catch(RemoteException remoteException){
+			logTransactionEvent(operation.getParentTransaction(), remoteException.getMessage());
+			throw new TransactionException(remoteException.getMessage());
+//			remoteException.printStackTrace();
 		} catch (NotBoundException e) {
-			e.printStackTrace();
+			logTransactionEvent(operation.getParentTransaction(), e.getMessage());
+			throw new TransactionException(e.getMessage());
+//			e.printStackTrace();
 		} catch (InvalidPeerException e) {
-			e.printStackTrace();
+			logTransactionEvent(operation.getParentTransaction(), e.getMessage());
+			throw new TransactionException(e.getMessage());
+//			e.printStackTrace();
 		}
 	}	
 	
@@ -148,7 +156,7 @@ public class TransactionManager implements ITransactionManager, ITransactionEven
 				int targetPeerID = operation.getTargetServerID();
 				Peer peer;
 				
-				System.out.println("TM - processing commit.");
+				System.out.println("TM - processing commit/abort.");
 								
 				try {
 					peer = PeerIDKeyedMap.getPeer(targetPeerID);
@@ -161,19 +169,43 @@ public class TransactionManager implements ITransactionManager, ITransactionEven
 					
 					for(Transaction activeTransaction : _lstActiveTransaction){
 						if(activeTransaction.equals(operation.getParentTransaction())){
-							activeTransaction.setActionResults(
-									operation.getParentTransaction().getActionResults());
-							activeTransaction.markComplete(operation.getParentTransaction().getCompleteType());
+							// Add to the results of the active transaction.
+							if(activeTransaction.getActionResults() != null){
+								for(String result : operation.getParentTransaction().getActionResults()){
+									activeTransaction.getActionResults().add(result);
+								}
+							}
+							
+							// Mark as complete only if all awaited commits have
+							// been received.
+							if(_htTransactionCommitsReceived.containsKey(activeTransaction) == false){
+								_htTransactionCommitsReceived.put(activeTransaction, 1);
+							}else{
+								int commitsReceived = _htTransactionCommitsReceived.get(activeTransaction);
+								_htTransactionCommitsReceived.put(activeTransaction, 
+										commitsReceived + 1);
+							}
+							
+							if(_htTransactionCommitsReceived.get(activeTransaction) == activeTransaction.getTotalTargetServers()){
+								System.out.println("Received from : " + _htTransactionCommitsReceived.get(activeTransaction));
+								activeTransaction.markComplete(operation.getParentTransaction().getCompleteType());
+								
+								// Remove entry from table: _htTransactionCommitsReceived
+//								_htTransactionCommitsReceived.remove(activeTransaction);
+							}
 						}
 					}
 				} catch (Exception exception) {
 					logTransactionEvent(operation.getParentTransaction(), "Results not obtained.");
 				}
 				
-				if(operation instanceof CommitOperation){
-					parentTransaction.markComplete(Transaction.COMMIT_COMPLETE);
-				}else{
-					parentTransaction.markComplete(Transaction.ABORT_COMPLETE);
+				if(_htTransactionCommitsReceived.get(parentTransaction) == 
+					parentTransaction.getTotalTargetServers()){
+					if(operation instanceof CommitOperation){
+						parentTransaction.markComplete(Transaction.COMMIT_COMPLETE);
+					}else{
+						parentTransaction.markComplete(Transaction.ABORT_COMPLETE);
+					}
 				}
 			}
 			

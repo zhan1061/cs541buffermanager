@@ -79,6 +79,9 @@ public class TransactionFrame extends JFrame implements IOperationCompletedEvent
 		if(_currentOperationIndex < _lstModel.getSize()){
 			_btnNext.setEnabled(true);
 			_btnAbort.setEnabled(true);
+			
+			// Highlight the next operation.
+			_lstBoxOperations.setSelectedIndex(_currentOperationIndex);
 		}else{
 			_btnCommit.setEnabled(true);
 			_btnAbort.setEnabled(true);
@@ -102,6 +105,7 @@ public class TransactionFrame extends JFrame implements IOperationCompletedEvent
 					// If the target server ID isn't already known, add it to our list.
 					if(_lstTargetServerID.contains(operationToExecute.getTargetServerID()) == false){
 						_lstTargetServerID.add(operationToExecute.getTargetServerID());
+						_transaction.setTotalTargetServers(_lstTargetServerID.size());
 					}
 					
 					_btnNext.setEnabled(false);
@@ -111,7 +115,7 @@ public class TransactionFrame extends JFrame implements IOperationCompletedEvent
 						_transactionManager.executeOperation(operationToExecute);
 					}catch(TransactionException transactionException){
 						// Try to abort.
-						// We may have to generate two multiple commit operations
+						// We may have to generate multiple commit operations
 						// if we talked to multiple schedulers during a transaction.
 						for(Integer targetServerID : _lstTargetServerID){
 							AbortOperation abortOperation = new AbortOperation(_transaction);
@@ -130,7 +134,7 @@ public class TransactionFrame extends JFrame implements IOperationCompletedEvent
 				}
 			}else if(event.getActionCommand().equals("Commit")){
 				try {
-					// We may have to generate two multiple commit operations
+					// We may have to generate multiple commit operations
 					// if we talked to multiple schedulers during a transaction.
 					for(Integer targetServerID : _lstTargetServerID){
 						CommitOperation commitOperation = new CommitOperation(_transaction);
@@ -145,7 +149,7 @@ public class TransactionFrame extends JFrame implements IOperationCompletedEvent
 					e.printStackTrace();
 				} catch (TransactionException e) {
 					// Try to abort.
-					// We may have to generate two multiple commit operations
+					// We may have to generate multiple commit operations
 					// if we talked to multiple schedulers during a transaction.
 					for(Integer targetServerID : _lstTargetServerID){
 						AbortOperation abortOperation = new AbortOperation(_transaction);

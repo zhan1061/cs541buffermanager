@@ -157,7 +157,8 @@ public class Scheduler implements IScheduler, ISchedulerEventGenerator {
 				
 				// Also, add this to the transaction result list.
 				Transaction parentTransaction = incrementOperation.getParentTransaction();
-				parentTransaction.getActionResults().add("Balance: " + incrementOperation.getNewBalance());
+				parentTransaction.getActionResults().add(
+						"Added: $" + incrementOperation.getIncrementAmount() + " to " + incrementOperation.getAccountID().toString());
 			}else{
 				// Also, add this to the transaction result list.
 				Transaction parentTransaction = incrementOperation.getParentTransaction();
@@ -178,7 +179,8 @@ public class Scheduler implements IScheduler, ISchedulerEventGenerator {
 				
 				// Also, add this to the transaction result list.
 				Transaction parentTransaction = decrementOperation.getParentTransaction();
-				parentTransaction.getActionResults().add("Balance: " + decrementOperation.getNewBalance());
+				parentTransaction.getActionResults().add(
+						"Subtracted: $" + decrementOperation.getDecrementAmount() + " from " + decrementOperation.getAccountID().toString());
 			}else{
 				// Also, add this to the transaction result list.
 				Transaction parentTransaction = decrementOperation.getParentTransaction();
@@ -203,7 +205,7 @@ public class Scheduler implements IScheduler, ISchedulerEventGenerator {
 			readOperation.setResult(readBalanceData[1]);
 			
 			Transaction parentTransaction = readOperation.getParentTransaction();
-			parentTransaction.getActionResults().add("Balance: " + readOperation.getResult());
+			parentTransaction.getActionResults().add("Balance: $" + readOperation.getResult());
 		}else{
 			// Also, add this to the transaction result list.
 			Transaction parentTransaction = readOperation.getParentTransaction();

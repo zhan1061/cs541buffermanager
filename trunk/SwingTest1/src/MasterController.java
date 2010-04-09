@@ -27,16 +27,6 @@ public class MasterController implements IPeerEventListener, ITransactionEventLi
 			//_uiHandler.appendLog("Local HeartBeat service registered.");
 		}	
 		
-		// Start HeartBeatServer.
-//		try{
-//			HeartBeatServer heartBeatServer = new HeartBeatServer(_serviceName, _registryPort);
-//			
-//			_uiHandler.appendLog("Local HeartBeat service registered.");
-//		}catch(Exception exception){
-//			// HeartBeat server start failure.
-//			_uiHandler.appendLog("Error occurred while attempting to start HeartBeatServer: " + exception.getMessage());		
-//		}
-		
 		Thread heartBeatServerThread = new Thread(new HeartBeatServerThread());
 		Thread transactionManagerServerThread = new Thread(new TransactionManagerServerThread());
 		Thread schedulerServerThread = new Thread(new SchedulerServerThread());
@@ -95,7 +85,8 @@ public class MasterController implements IPeerEventListener, ITransactionEventLi
 			_peerMonitor.addPeer(peerEvent.getPeer());
 			
 			// Peer added successfully to monitor.
-			_uiHandler.appendLog("Peer [" + peerEvent.getPeer().getPeerName() + "] added successfully.");
+			_uiHandler.appendLog("Peer [" + peerEvent.getPeer().getPeerID() + ":" + 
+					peerEvent.getPeer().getPeerName() + "] added successfully.");
 		}catch(InvalidPeerException invalidPeerException){
 			_uiHandler.appendLog("Invalid peer");
 		}
@@ -104,7 +95,8 @@ public class MasterController implements IPeerEventListener, ITransactionEventLi
 	@Override
 	public void peerRemoved(PeerEvent peerEvent) {
 		// Peer removed.
-		_uiHandler.appendLog("Peer [" + peerEvent.getPeer().getPeerName() + "] failed.");
+		_uiHandler.appendLog("Peer [" + peerEvent.getPeer().getPeerID() + ":" + 
+				peerEvent.getPeer().getPeerName() + "] failed.");
 	}
 
 	class HeartBeatServerThread implements Runnable {

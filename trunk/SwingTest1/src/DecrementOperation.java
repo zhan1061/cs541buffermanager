@@ -19,6 +19,10 @@ public class DecrementOperation extends WriteOperation {
 		return _oldBalance - _decrementAmount;
 	}
 	
+	public double getDecrementAmount(){
+		return _decrementAmount;
+	}
+	
 	@Override
 	public double getOldBalance(){
 		return _oldBalance;
