@@ -107,7 +107,6 @@ public class TransactionManager implements ITransactionManager, ITransactionEven
 			}
 		}		
 		
-		System.out.println("Throwing exception!!!!");
 		throw new RemoteException("Transaction object not found.");
 	}
 	
