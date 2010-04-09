@@ -1,5 +1,7 @@
+import java.io.Serializable;
 
-public abstract class WriteOperation implements IOperation {
+
+public abstract class WriteOperation implements IOperation{
 	private AccountID _accountID;
 //	private double _newBalance;
 //	private Transaction _parentTransaction;

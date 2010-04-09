@@ -1,7 +1,8 @@
+import java.io.Serializable;
 import java.util.ArrayList;
 
 
-public class TransferAction implements IAction{
+public class TransferAction implements IAction, Serializable{
 	private AccountID _fromAccountID;
 	private AccountID _toAccountID;
 	private Transaction _parentTransaction;

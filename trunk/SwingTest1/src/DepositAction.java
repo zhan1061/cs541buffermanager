@@ -1,6 +1,7 @@
+import java.io.Serializable;
 import java.util.ArrayList;
 
-public class DepositAction implements IAction{
+public class DepositAction implements IAction, Serializable{
 	private AccountID _accountID;
 	private Transaction _parentTransaction;
 	private ArrayList<IOperation> _lstOperation = null;

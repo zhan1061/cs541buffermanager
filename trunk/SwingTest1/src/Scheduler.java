@@ -25,6 +25,7 @@ public class Scheduler implements IScheduler, ISchedulerEventGenerator {
 	
 	public Scheduler(){
 		_localPeerID = (Integer)GlobalState.get("localPeerID");
+		System.out.println("Scheduler created!!");
 	}
 	
 	@Override
@@ -221,13 +222,13 @@ public class Scheduler implements IScheduler, ISchedulerEventGenerator {
 	 */
 	private boolean isOperationConflicting(IOperation operation, ArrayList<IOperation> lstOperation){
 		for(IOperation testOperation : lstOperation){
-			if(operation instanceof WriteOperation){
+			if(operation instanceof IncrementOperation || operation instanceof DecrementOperation){
 				// Regardless of the test operation type, this is a conflict.
 				if(operation.getParentTransaction().equals(testOperation.getParentTransaction()) == false){
 					return true;
 				}
 			}else{
-				if(testOperation instanceof WriteOperation){
+				if(testOperation instanceof IncrementOperation || testOperation instanceof DecrementOperation){
 					if(operation.getParentTransaction().equals(testOperation.getParentTransaction()) == false){
 						return true;
 					}
@@ -306,11 +307,12 @@ public class Scheduler implements IScheduler, ISchedulerEventGenerator {
 	private void scheduleCommitOperation(CommitOperation commitOperation) throws Exception{
 		// Release all locks held by the parent transaction.
 		Transaction parentTransaction = commitOperation.getParentTransaction();
+		ITransactionManager transactionManager = getTransactionManagerRemoteObj(commitOperation);
 		
 		// Go thru owner lists and release locks.
-		if(commitOperation.getParentTransaction().equals(_accountCatalogOwnerOperation.getParentTransaction())){
+		if(_accountCatalogOwnerOperation != null && 
+				commitOperation.getParentTransaction().equals(_accountCatalogOwnerOperation.getParentTransaction())){
 			// Commit immediately.
-			ITransactionManager transactionManager = getTransactionManagerRemoteObj(commitOperation);
 			
 			try {
 				commitOperation.getParentTransaction().markComplete(Transaction.COMMIT_COMPLETE);
@@ -331,6 +333,7 @@ public class Scheduler implements IScheduler, ISchedulerEventGenerator {
 			
 			// Mark transaction as complete.
 			commitOperation.getParentTransaction().markComplete(Transaction.COMMIT_COMPLETE);
+			transactionManager.operationComplete(commitOperation);
 			
 			// Remove transactoin from completed operations table (we won't be
 			// rolling back any operation for this transaction since it has committed).
@@ -368,7 +371,8 @@ public class Scheduler implements IScheduler, ISchedulerEventGenerator {
 		ITransactionManager transactionManager = getTransactionManagerRemoteObj(abortOperation);
 		
 		// Go thru owner lists and release locks.
-		if(abortOperation.getParentTransaction().equals(_accountCatalogOwnerOperation.getParentTransaction())){
+		if(_accountCatalogOwnerOperation != null && 
+				abortOperation.getParentTransaction().equals(_accountCatalogOwnerOperation.getParentTransaction())){
 			// Abort immediately.
 			try {
 				parentTransaction.markComplete(Transaction.ABORT_COMPLETE);
