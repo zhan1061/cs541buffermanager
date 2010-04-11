@@ -71,6 +71,34 @@ public class TransactionFrame extends JFrame implements IOperationCompletedEvent
 		}
 	}
 
+	/**
+	 * Aborts the encapsulated transaction. It sends the abort
+	 * command to every scheduler that was in communication during the
+	 * transaction.
+	 */
+	public void abort(){
+		try {
+			// We may have to generate multiple abort operations
+			// if we talked to multiple schedulers during a transaction.
+			for(Integer targetServerID : _lstTargetServerID){
+				AbortOperation abortOperation = new AbortOperation(_transaction);
+				
+				abortOperation.setTargetServerID(targetServerID);
+				
+				try{
+					_transactionManager.executeOperation(abortOperation);
+				}catch(TransactionException transactionException){
+					// Do nothing if abort fails.
+				}
+			}
+			
+			_btnCommit.setEnabled(false);
+			_btnAbort.setEnabled(false);
+		} catch (RemoteException e) {
+			e.printStackTrace();
+		}
+	}
+	
 	@Override
 	public void operationCompleted(IOperation operation) {
 		System.out.println(operation.toString() + " - completed.");

@@ -40,6 +40,12 @@ public class TransactionManager implements ITransactionManager, ITransactionEven
 		
 		System.out.println("Adding to controller map: " + transaction.getTransactionID().toString());
 		_htTransactionController.put(transaction, transactionFrame);
+		
+		// Remove duplicate transaction.
+		if(_lstActiveTransaction.contains(transaction)){
+			_lstActiveTransaction.remove(transaction);
+		}
+		
 		_lstActiveTransaction.add(transaction);
 	}
 
@@ -85,7 +91,46 @@ public class TransactionManager implements ITransactionManager, ITransactionEven
 			throw new TransactionException(e.getMessage());
 //			e.printStackTrace();
 		}
-	}	
+	}
+	
+	/**
+	 * If the transaction hasn't already committed, attempts to kill it.
+	 * @throws RemoteException 
+	 */
+	public void wound(Transaction transaction) throws RemoteException{
+		// Find the transaction in our active transaction list.
+		// If it is not found, it means that has already completed. So
+		// do nothing.
+		// It it is, and its status is 'completed', then again, do nothing.
+		for(Transaction activeTransaction : _lstActiveTransaction){
+			if(activeTransaction.equals(transaction)){
+				// Found transaction. Let's check the completion status.
+				if(activeTransaction.isComplete() == false){
+					// We can wound this transaction. Get the corresponding controller.
+					TransactionFrame transactionController = _htTransactionController.get(activeTransaction);
+					
+					transactionController.abort();
+					// Close this controller and begin the transaction anew.
+					transactionController.setVisible(false);
+					activeTransaction.setTotalTargetServers(0);
+					
+					if(_htTransactionCommitsReceived.containsKey(activeTransaction)){
+						// Reset the number of aborts received. This needs to be done
+						// because a transaction with the same ID (in fact, the same transaction),
+						// was just aborted.
+						_htTransactionCommitsReceived.put(activeTransaction, 0);
+					}
+					
+					// Create a copy of the active transaction.
+					Transaction newTransaction = new Transaction(activeTransaction.getOriginatingServerID(), 
+							activeTransaction.getAction());
+					newTransaction.setTransactionID(activeTransaction.getTransactionID());					
+					
+					begin(newTransaction);
+				}
+			}
+		}
+	}
 	
 	/**
 	 * This method is supposed to be invoked by the client. Its side
@@ -111,9 +156,9 @@ public class TransactionManager implements ITransactionManager, ITransactionEven
 				}else{
 //					System.out.println("Returning false!!!");
 					return false;
-				}				
+				}
 			}
-		}		
+		}
 		
 		throw new RemoteException("Transaction object not found.");
 	}
@@ -134,7 +179,10 @@ public class TransactionManager implements ITransactionManager, ITransactionEven
 		// be thrown.
 		if(transaction.isComplete()){
 			logTransactionEvent(transaction, "Cleaned up.");
-			_lstActiveTransaction.remove(transaction);
+			
+			synchronized (_lstActiveTransaction) {
+				_lstActiveTransaction.remove(transaction);			
+			}			
 		}else{
 			throw new TransactionException("Attempt to delete incomplete transaction.");
 		}
@@ -167,31 +215,33 @@ public class TransactionManager implements ITransactionManager, ITransactionEven
 							schedulerRemoteObj.getFinalTransactionResult(operation.getParentTransaction()));
 					logTransactionEvent(operation.getParentTransaction(), "Results obtained.");
 					
-					for(Transaction activeTransaction : _lstActiveTransaction){
-						if(activeTransaction.equals(operation.getParentTransaction())){
-							// Add to the results of the active transaction.
-							if(activeTransaction.getActionResults() != null){
-								for(String result : operation.getParentTransaction().getActionResults()){
-									activeTransaction.getActionResults().add(result);
+					synchronized(_lstActiveTransaction){
+						for(Transaction activeTransaction : _lstActiveTransaction){
+							if(activeTransaction.equals(operation.getParentTransaction())){
+								// Add to the results of the active transaction.
+								if(activeTransaction.getActionResults() != null){
+									for(String result : operation.getParentTransaction().getActionResults()){
+										activeTransaction.getActionResults().add(result);
+									}
 								}
-							}
-							
-							// Mark as complete only if all awaited commits have
-							// been received.
-							if(_htTransactionCommitsReceived.containsKey(activeTransaction) == false){
-								_htTransactionCommitsReceived.put(activeTransaction, 1);
-							}else{
-								int commitsReceived = _htTransactionCommitsReceived.get(activeTransaction);
-								_htTransactionCommitsReceived.put(activeTransaction, 
-										commitsReceived + 1);
-							}
-							
-							if(_htTransactionCommitsReceived.get(activeTransaction) == activeTransaction.getTotalTargetServers()){
-								System.out.println("Received from : " + _htTransactionCommitsReceived.get(activeTransaction));
-								activeTransaction.markComplete(operation.getParentTransaction().getCompleteType());
-								
-								// Remove entry from table: _htTransactionCommitsReceived
-//								_htTransactionCommitsReceived.remove(activeTransaction);
+
+								// Mark as complete only if all awaited commits/aborts have
+								// been received.
+								if(_htTransactionCommitsReceived.containsKey(activeTransaction) == false){
+									_htTransactionCommitsReceived.put(activeTransaction, 1);
+								}else{
+									int commitsReceived = _htTransactionCommitsReceived.get(activeTransaction);
+									_htTransactionCommitsReceived.put(activeTransaction, 
+											commitsReceived + 1);
+								}
+
+								if(_htTransactionCommitsReceived.get(activeTransaction) == activeTransaction.getTotalTargetServers()){
+									System.out.println("Received from : " + _htTransactionCommitsReceived.get(activeTransaction));
+									activeTransaction.markComplete(operation.getParentTransaction().getCompleteType());
+
+									// Remove entry from table: _htTransactionCommitsReceived
+									//								_htTransactionCommitsReceived.remove(activeTransaction);
+								}
 							}
 						}
 					}

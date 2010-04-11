@@ -39,6 +39,10 @@ public class Transaction implements Serializable{
 		return _transactionID;
 	}
 	
+	public void setTransactionID(TransactionID transactionID){
+		_transactionID = transactionID;
+	}
+	
 	public ArrayList <String> getActionResults(){
 		return _lstActionResult;
 	}
@@ -51,6 +55,10 @@ public class Transaction implements Serializable{
 		// Also make sure that the result list is complete.
 		_completeType = completeType;
 		_bCompleted = true;
+	}
+	
+	public IAction getAction(){
+		return _action;
 	}
 	
 	public int getCompleteType(){

@@ -13,6 +13,7 @@ public class Scheduler implements IScheduler, ISchedulerEventGenerator {
 	private ArrayList<CreateAccountOperation> _lstAccountCatalogWaitList = new ArrayList<CreateAccountOperation>();
 	private IOperation _accountCatalogOwnerOperation = null;
 	private ComparisonTable<Transaction, ArrayList<IOperation>> _htCompletedOperationsTable = new ComparisonTable<Transaction, ArrayList<IOperation>>();
+	private ComparisonTable<Transaction, ArrayList<String>> _htTransactionResultsTable = new ComparisonTable<Transaction, ArrayList<String>>();
 	private static int _lastAccountIDNumber = 0;
 	private ArrayList<Transaction> _lstUnqueriedTransaction = new ArrayList<Transaction>();
 	private ISchedulerEventListener _schedulerEventListener = null;
@@ -77,7 +78,7 @@ public class Scheduler implements IScheduler, ISchedulerEventGenerator {
 	
 	/**
 	 * Removes and returns the first waiting operation in the lock wait table.
-	 * Null is returned if there are not waiting operations.
+	 * Null is returned if there are no waiting operations.
 	 * @return IOperation
 	 */
 	private IOperation removeFirstWaitingOperation(){
@@ -88,8 +89,10 @@ public class Scheduler implements IScheduler, ISchedulerEventGenerator {
 			AccountID firstAccountID = lstAccountID.get(0);
 			ArrayList<IOperation> lstWaitingOperation = _htAccountLockWaitTable.get(firstAccountID);
 			
-			// Get the first operation from the list of waiting operations.
-			waitingOperation = lstWaitingOperation.remove(0);
+			if(lstWaitingOperation != null && lstWaitingOperation.isEmpty() == false){
+				// Get the first operation from the list of waiting operations.
+				waitingOperation = lstWaitingOperation.remove(0);
+			}
 			
 			// If removing the operation causes the waiting list to become
 			// empty, remove the account's entry from the wait table.
@@ -108,7 +111,7 @@ public class Scheduler implements IScheduler, ISchedulerEventGenerator {
 	private void removeTransactionFromOwnerLists(Transaction transaction) {
 		//for(ArrayList<IOperation> lstOwnerTransaction : _ht)
 		ArrayList<AccountID> lstAccountID = _htAccountOwnerTable.keys();
-		
+				
 		for(AccountID accountID : lstAccountID){
 			ArrayList<IOperation> lstOperationToDelete = new ArrayList<IOperation>();
 			ArrayList<IOperation> lstAccountOperation = _htAccountOwnerTable.get(accountID);
@@ -123,6 +126,60 @@ public class Scheduler implements IScheduler, ISchedulerEventGenerator {
 			for(IOperation operationToDelete : lstOperationToDelete){
 				lstAccountOperation.remove(operationToDelete);
 			}
+		}
+		
+		// Remove all accountIDs which have no owners.
+		ArrayList<AccountID> lstAccountIDsToRemove = new ArrayList<AccountID>();
+		
+		for(AccountID accountID : lstAccountID){
+			ArrayList<IOperation> lstAccountOperation = _htAccountOwnerTable.get(accountID);
+			
+			if(lstAccountOperation == null || lstAccountOperation.isEmpty()){
+				lstAccountIDsToRemove.add(accountID);
+			}
+		}
+		
+		for(AccountID accountIDToRemove : lstAccountIDsToRemove){
+			_htAccountOwnerTable.remove(accountIDToRemove);
+		}
+	}
+	
+	/**
+	 * Remove all operations belonging to transaction from owner lists.
+	 * @param transaction
+	 */
+	private void removeTransactionFromWaitLists(Transaction transaction) {
+		ArrayList<AccountID> lstAccountID = _htAccountLockWaitTable.keys();
+		
+		for(AccountID accountID : lstAccountID){
+			ArrayList<IOperation> lstOperationToDelete = new ArrayList<IOperation>();
+			ArrayList<IOperation> lstAccountOperation = _htAccountLockWaitTable.get(accountID);
+			
+			for(IOperation operation : lstAccountOperation){
+				if(operation.getParentTransaction().equals(transaction)){
+					lstOperationToDelete.add(operation);					
+				}
+			}
+			
+			// Delete all operations that are in lstOperationToDelete
+			for(IOperation operationToDelete : lstOperationToDelete){
+				lstAccountOperation.remove(operationToDelete);
+			}
+		}
+		
+		// Remove all accountIDs which have no operations waiting.
+		ArrayList<AccountID> lstAccountIDsToRemove = new ArrayList<AccountID>();
+		
+		for(AccountID accountID : lstAccountID){
+			ArrayList<IOperation> lstAccountOperation = _htAccountLockWaitTable.get(accountID);
+			
+			if(lstAccountOperation == null || lstAccountOperation.isEmpty()){
+				lstAccountIDsToRemove.add(accountID);
+			}
+		}
+		
+		for(AccountID accountIDToRemove : lstAccountIDsToRemove){
+			_htAccountLockWaitTable.remove(accountIDToRemove);
 		}
 	}
 
@@ -157,12 +214,14 @@ public class Scheduler implements IScheduler, ISchedulerEventGenerator {
 				
 				// Also, add this to the transaction result list.
 				Transaction parentTransaction = incrementOperation.getParentTransaction();
-				parentTransaction.getActionResults().add(
-						"Added: $" + incrementOperation.getIncrementAmount() + " to " + incrementOperation.getAccountID().toString());
+//				parentTransaction.getActionResults().add(
+//						"Added: $" + incrementOperation.getIncrementAmount() + " to " + incrementOperation.getAccountID().toString());
+				addResultToTransaction(parentTransaction, "Added: $" + incrementOperation.getIncrementAmount() + " to " + incrementOperation.getAccountID().toString());
 			}else{
 				// Also, add this to the transaction result list.
 				Transaction parentTransaction = incrementOperation.getParentTransaction();
-				parentTransaction.getActionResults().add("Unable to write new balance.");
+//				parentTransaction.getActionResults().add("Unable to write new balance.");
+				addResultToTransaction(parentTransaction, "Unable to write new balance.");
 				
 				throw new TransactionException("Unable to write new balance.");
 			}
@@ -179,12 +238,15 @@ public class Scheduler implements IScheduler, ISchedulerEventGenerator {
 				
 				// Also, add this to the transaction result list.
 				Transaction parentTransaction = decrementOperation.getParentTransaction();
-				parentTransaction.getActionResults().add(
+//				parentTransaction.getActionResults().add(
+//						"Subtracted: $" + decrementOperation.getDecrementAmount() + " from " + decrementOperation.getAccountID().toString());
+				addResultToTransaction(parentTransaction, 
 						"Subtracted: $" + decrementOperation.getDecrementAmount() + " from " + decrementOperation.getAccountID().toString());
 			}else{
 				// Also, add this to the transaction result list.
 				Transaction parentTransaction = decrementOperation.getParentTransaction();
-				parentTransaction.getActionResults().add("Unable to write new balance.");
+//				parentTransaction.getActionResults().add("Unable to write new balance.");
+				addResultToTransaction(parentTransaction, "Unable to write new balance.");
 				
 				throw new TransactionException("Unable to write new balance.");
 			}	
@@ -205,17 +267,42 @@ public class Scheduler implements IScheduler, ISchedulerEventGenerator {
 			readOperation.setResult(readBalanceData[1]);
 			
 			Transaction parentTransaction = readOperation.getParentTransaction();
-			parentTransaction.getActionResults().add("Balance: $" + readOperation.getResult());
+//			parentTransaction.getActionResults().add("Balance: $" + readOperation.getResult());
+			addResultToTransaction(parentTransaction, "Balance: $" + readOperation.getResult());
 		}else{
 			// Also, add this to the transaction result list.
 			Transaction parentTransaction = readOperation.getParentTransaction();
-			parentTransaction.getActionResults().add("Unable to get balance.");
+//			parentTransaction.getActionResults().add("Unable to get balance.");
+			addResultToTransaction(parentTransaction, "Unable to get balance.");
 			
 			throw new TransactionException("Unable to get balance.");
-		}
-		
+		}		
 	}
 
+	/**
+	 * Adds result to transaction.
+	 * @param transaction
+	 * @param result
+	 */
+	private void addResultToTransaction(Transaction transaction, String result){
+		if(_htTransactionResultsTable.containsKey(transaction)){
+			ArrayList<String> lstTransactionResult = _htTransactionResultsTable.get(transaction);
+			
+			if(lstTransactionResult != null){
+				lstTransactionResult.add(result);
+			}
+		}else{
+			ArrayList<String> lstTransactionResult = new ArrayList<String>();
+			
+			lstTransactionResult.add(result);
+			_htTransactionResultsTable.put(transaction, lstTransactionResult);
+		}
+	}
+	
+	private ArrayList<String> getAllResultsForTransaction(Transaction transaction){
+		return _htTransactionResultsTable.get(transaction);
+	}
+	
 	/**
 	 * Returns true if operation conflicts with at least one of the operations in the list.
 	 * @param operation
@@ -234,6 +321,23 @@ public class Scheduler implements IScheduler, ISchedulerEventGenerator {
 					if(operation.getParentTransaction().equals(testOperation.getParentTransaction()) == false){
 						return true;
 					}
+				}
+			}
+		}
+		
+		return false;
+	}
+	
+	private boolean doOperationsConflict(IOperation operation1, IOperation operation2){
+		if(operation1 instanceof IncrementOperation || operation1 instanceof DecrementOperation){
+			// Regardless of the test operation type, this is a conflict.
+			if(operation1.getParentTransaction().equals(operation2.getParentTransaction()) == false){
+				return true;
+			}
+		}else{
+			if(operation2 instanceof IncrementOperation || operation2 instanceof DecrementOperation){
+				if(operation1.getParentTransaction().equals(operation2.getParentTransaction()) == false){
+					return true;
 				}
 			}
 		}
@@ -331,10 +435,12 @@ public class Scheduler implements IScheduler, ISchedulerEventGenerator {
 			// Non-account-creation operation.
 			// Release all locks held by operations of the commit operation's
 			// parent transaction.
-			removeTransactionFromOwnerLists(commitOperation.getParentTransaction());
+			removeTransactionFromOwnerLists(parentTransaction);
+			removeTransactionFromWaitLists(parentTransaction);
 			
 			// Mark transaction as complete.
 			commitOperation.getParentTransaction().markComplete(Transaction.COMMIT_COMPLETE);
+			parentTransaction.setActionResults(_htTransactionResultsTable.get(parentTransaction));
 			transactionManager.operationComplete(commitOperation);
 			
 			// Remove transactoin from completed operations table (we won't be
@@ -392,12 +498,15 @@ public class Scheduler implements IScheduler, ISchedulerEventGenerator {
 			// Release all locks held by operations of the abort operation's
 			// parent transaction.
 			removeTransactionFromOwnerLists(parentTransaction);
+			removeTransactionFromWaitLists(parentTransaction);
+			
 			// Mark transaction as complete.
 			parentTransaction.markComplete(Transaction.ABORT_COMPLETE);			
 			rollbackTransaction(parentTransaction);
 			// Remove transactoin from completed operations table.
-			_htCompletedOperationsTable.remove(parentTransaction);
-			transactionManager.operationComplete(abortOperation);
+			_htCompletedOperationsTable.remove(parentTransaction);			
+			parentTransaction.setActionResults(_htTransactionResultsTable.get(parentTransaction));
+			transactionManager.operationComplete(abortOperation);			
 		}
 		
 		// If the wait list for the account catalog is not empty,
@@ -417,6 +526,8 @@ public class Scheduler implements IScheduler, ISchedulerEventGenerator {
 			if(firstWaitingOperation != null){
 				// Schedule this operation.
 				scheduleReadWriteOperation(firstWaitingOperation);
+			}else{
+				System.out.println("No waiting operation!!");
 			}
 		}	
 	}
@@ -467,8 +578,10 @@ public class Scheduler implements IScheduler, ISchedulerEventGenerator {
 				}
 				
 				lstWaitListForAccount = _htAccountLockWaitTable.get(targetAccountID);
-				
 				lstWaitListForAccount.add(operation);
+				
+				// Wound every transaction that is younger and is in conflict. 
+				woundYoungerOperationTransactions(operation, targetAccountID);
 			}else{
 				// Add this operation to the list of owners.
 				if(lstOwnerListForAccount == null){
@@ -495,11 +608,61 @@ public class Scheduler implements IScheduler, ISchedulerEventGenerator {
 					// Add to list of completed operations for the transaction.
 					addToTransactionListOfCompletedOperations(parentTransaction, operation);
 				} catch (RemoteException e) {
-					e.printStackTrace();
+					throw new TransactionException(e.getMessage());
 				}
 			}
 		}
 	}	
+	
+	/**
+	 * Wounds all those transactions that are younger and are conflicting on
+	 * this account.
+	 * @param accountID 
+	 * @param parentTransaction
+	 */
+	private void woundYoungerOperationTransactions(IOperation operation, AccountID accountID) throws TransactionException{
+		ArrayList<IOperation> lstOwnerListForAccount = _htAccountOwnerTable.get(accountID);
+		Transaction transaction = operation.getParentTransaction();
+		ArrayList<IOperation> lstOperationToWound = new ArrayList<IOperation>(); 
+		
+		for(IOperation ownerOperation : lstOwnerListForAccount){
+			Transaction ownerTransaction = ownerOperation.getParentTransaction();
+			boolean bOwnerVictim = false;
+			
+			// Check if owner is younger and in conflict.
+			if(transaction.getTransactionID().getPeerID() < ownerTransaction.getTransactionID().getPeerID()){
+				bOwnerVictim = true;
+			}else if(transaction.getTransactionID().getPeerID() == 
+				ownerTransaction.getTransactionID().getPeerID()){
+				if(transaction.getTransactionID().getLocalTransactionNumber() < 
+						ownerTransaction.getTransactionID().getLocalTransactionNumber()){
+					if(doOperationsConflict(operation, ownerOperation)){
+						bOwnerVictim = true;
+					}
+				}
+			}
+			
+			if(bOwnerVictim){
+				// Add to wound target list.				
+				lstOperationToWound.add(ownerOperation);				
+			}
+		}
+		
+		// Now start wounding operations/transactions.
+		for(IOperation operationToWound : lstOperationToWound){
+			ITransactionManager ownerTransactionManager = getTransactionManagerRemoteObj(operationToWound);
+			try {
+				ownerTransactionManager.wound(operationToWound.getParentTransaction());
+			} catch (RemoteException remoteException) {
+				throw new TransactionException(remoteException.getMessage());
+			}
+		}
+	}
+
+	private boolean isTransactionYoungerAndConflicting(Transaction transaction1, Transaction transaction2){
+		
+		return false;		
+	}
 	
 	private boolean isLockOwnerTableEmpty(){
 		ArrayList<AccountID> lstAccountID = _htAccountOwnerTable.keys();
@@ -524,7 +687,11 @@ public class Scheduler implements IScheduler, ISchedulerEventGenerator {
 		if(_lstUnqueriedTransaction.contains(transaction) && transaction.isComplete()){
 			int transactionOffset = _lstUnqueriedTransaction.indexOf(transaction);
 			
-			return _lstUnqueriedTransaction.get(transactionOffset).getActionResults();
+			if(getAllResultsForTransaction(transaction) == null){
+				return _lstUnqueriedTransaction.get(transactionOffset).getActionResults();
+			}else{
+				return getAllResultsForTransaction(transaction);
+			}
 		}
 		
 		return null;
