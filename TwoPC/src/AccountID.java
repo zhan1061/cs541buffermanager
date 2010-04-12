@@ -1,6 +1,10 @@
 import java.io.Serializable;
 
-
+/**
+ * Account information.
+ * @author anurag
+ *
+ */
 public class AccountID implements Serializable{
 	private int _peerID;
 	private int _localAccountNumber;
