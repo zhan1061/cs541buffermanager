@@ -22,6 +22,8 @@ public class ServerFrame extends JFrame implements IUserInteractionHandler, Acti
 	JButton _btnAddPeer = null;
 	JScrollPane _scpStatus = null;
 	JTextArea _txtStatus = null;
+	JButton _btnFailRecover = null;
+	
 	// Set default size parameters.
 	int _windowWidth = 800;
 	int _windowHeight = 400;
@@ -44,6 +46,7 @@ public class ServerFrame extends JFrame implements IUserInteractionHandler, Acti
 		_lblPeerPortNumber = new JLabel("Peer port:");
 		_tfPeerPortNumber = new JTextField(10);
 		_btnAddPeer = new JButton("Add Peer");
+		_btnFailRecover = new JButton("Fail");
 		
 		_pnlPeerDetails.add(_lblPeerName);
 		_pnlPeerDetails.add(_tfPeerName);
@@ -52,7 +55,8 @@ public class ServerFrame extends JFrame implements IUserInteractionHandler, Acti
 		_pnlPeerDetails.add(_lblPeerPortNumber);
 		_pnlPeerDetails.add(_tfPeerPortNumber);
 		_pnlPeerDetails.add(_btnAddPeer);
-				
+		_pnlPeerDetails.add(_btnFailRecover);
+		
 		getContentPane().add(_pnlPeerDetails, BorderLayout.NORTH);
 		_pnlPeerDetails.setPreferredSize(new Dimension(_windowWidth, 50));
 		
@@ -68,6 +72,7 @@ public class ServerFrame extends JFrame implements IUserInteractionHandler, Acti
 		// Add window listener.
 		addWindowListener(new MyWindowAdapter());
 		_btnAddPeer.addActionListener(this);
+		_btnFailRecover.addActionListener(this);
 		
 		setVisible(true);
 	}
@@ -86,7 +91,6 @@ public class ServerFrame extends JFrame implements IUserInteractionHandler, Acti
 
 	@Override
 	public void addPeerEventListener(IPeerEventListener peerEventListener) {
-		// TODO Auto-generated method stub
 		_peerEventListener = peerEventListener;
 	}
 
@@ -114,6 +118,22 @@ public class ServerFrame extends JFrame implements IUserInteractionHandler, Acti
 			_tfPeerHostName.setText("");
 			_tfPeerName.setText("");
 			_tfPeerPortNumber.setText("");
+		}else if(e.getActionCommand().equals("Fail")){
+			appendLog("Simulating site failure");
+			// Raise a failure event.
+			FailureEventMonitor.getFailureEventMonitor().triggerFailureEvent(
+					new FailureEvent(FailureEvent.FAILURE_EVENT));
+			
+			_btnFailRecover.setText("Recover");
+			_btnFailRecover.setActionCommand("Recover");
+		}else if(e.getActionCommand().equals("Recover")){
+			appendLog("Simulating site recovery");
+			// Raise a failure event.
+			FailureEventMonitor.getFailureEventMonitor().triggerFailureEvent(
+					new FailureEvent(FailureEvent.RECOVERY_EVENT));
+			
+			_btnFailRecover.setText("Fail");
+			_btnFailRecover.setActionCommand("Fail");
 		}
 	}
 	

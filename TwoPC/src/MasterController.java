@@ -149,7 +149,11 @@ public class MasterController implements IPeerEventListener, ITransactionEventLi
 
 	@Override
 	public void transactionEventOccurred(TransactionEvent transactionEvent) {
-		_uiHandler.appendLog(transactionEvent.getTransaction().toString()+ " - " + transactionEvent.getMessage());		
+		if(transactionEvent.getTransaction() != null){
+			_uiHandler.appendLog(transactionEvent.getTransaction().toString()+ " - " + transactionEvent.getMessage());
+		}else{
+			_uiHandler.appendLog(transactionEvent.getMessage());
+		}
 	}
 
 	@Override

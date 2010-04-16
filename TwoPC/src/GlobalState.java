@@ -16,6 +16,10 @@ public class GlobalState {
 		}
 	}
 	
+	public static boolean containsKey(String key){
+		return _htGlobalTable.containsKey(key);
+	}
+	
 	public static void set(String key, Object value){
 		_htGlobalTable.put(key, value);
 	}
