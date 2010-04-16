@@ -4,6 +4,7 @@ public class Peer {
 	private String _peerHostname;
 	private int _peerPortNumber;
 	private int _peerID;
+	private int _peerState;
 	
 	public Peer(String peerName, String peerHostname, int peerPortNumber){
 		setPeerName(peerName);
@@ -66,5 +67,13 @@ public class Peer {
 	
 	public String toString(){
 		return _peerName + "(" + _peerID + ")" + "@" + _peerHostname + ":" + _peerPortNumber;
+	}
+
+	public void setPeerState(int _peerState) {
+		this._peerState = _peerState;
+	}
+
+	public int getPeerState() {
+		return _peerState;
 	}
 }

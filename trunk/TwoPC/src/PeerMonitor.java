@@ -98,6 +98,7 @@ public class PeerMonitor implements IPeerMonitor{
 		for(Peer peer : lstPeer){
 			_synchlstPeer.add(peer);
 			_htPeerState.put(peer, Constants.PEER_STATE_DEAD);
+			PeerIDKeyedMap.getPeer(peer.getPeerID()).setPeerState(Constants.PEER_STATE_DEAD);
 		}
 	}
 	
@@ -126,6 +127,7 @@ public class PeerMonitor implements IPeerMonitor{
 		if(heartBeatClient.checkPeerStatus(peer)){			
 			_synchlstPeer.add(peer);
 			_htPeerState.put(peer, Constants.PEER_STATE_ALIVE);
+			PeerIDKeyedMap.getPeer(peer.getPeerID()).setPeerState(Constants.PEER_STATE_ALIVE);
 		}else{
 			throw new InvalidPeerException("Peer is either non-existent, or has died.");
 		}		
@@ -182,6 +184,13 @@ public class PeerMonitor implements IPeerMonitor{
 							// Also, reflect the latest status in the state table.
 							if(_htPeerState.get(activeEntity.getPeer()) == Constants.PEER_STATE_DEAD){
 								_htPeerState.put(activeEntity.getPeer(), Constants.PEER_STATE_ALIVE);
+								
+								try {
+									PeerIDKeyedMap.getPeer(activeEntity.getPeer().getPeerID()).setPeerState(Constants.PEER_STATE_ALIVE);
+								} catch (InvalidPeerException e) {
+									e.printStackTrace();
+								}
+								
 //								System.out.println(activeEntity.getPeer().getPeerName() + " alive.");
 								
 								PeerEvent peerEventAdded = new PeerEvent(PeerEvent.PEER_ADDED, activeEntity.getPeer());
@@ -193,6 +202,12 @@ public class PeerMonitor implements IPeerMonitor{
 							// Also, reflect the latest status in the state table.
 							if(_htPeerState.get(activeEntity.getPeer()) == Constants.PEER_STATE_ALIVE){
 								_htPeerState.put(activeEntity.getPeer(), Constants.PEER_STATE_DEAD);
+								
+								try {
+									PeerIDKeyedMap.getPeer(activeEntity.getPeer().getPeerID()).setPeerState(Constants.PEER_STATE_DEAD);
+								} catch (InvalidPeerException e) {
+									e.printStackTrace();
+								}
 								
 								// Generate peer event.
 								PeerEvent peerEventRemoved = new PeerEvent(PeerEvent.PEER_REMOVED, activeEntity.getPeer());
@@ -212,6 +227,12 @@ public class PeerMonitor implements IPeerMonitor{
 							// Also, reflect the latest status in the state table.
 							if(_htPeerState.get(activeEntity.getPeer()) == Constants.PEER_STATE_ALIVE){
 								_htPeerState.put(activeEntity.getPeer(), Constants.PEER_STATE_DEAD);
+								
+								try {
+									PeerIDKeyedMap.getPeer(activeEntity.getPeer().getPeerID()).setPeerState(Constants.PEER_STATE_DEAD);
+								} catch (InvalidPeerException e) {
+									e.printStackTrace();
+								}
 								
 								// Generate peer event.
 								PeerEvent peerEventRemoved = new PeerEvent(PeerEvent.PEER_REMOVED, activeEntity.getPeer());

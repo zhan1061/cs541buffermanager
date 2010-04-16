@@ -7,16 +7,18 @@ import java.util.HashMap;
 import java.util.Hashtable;
 
 
-public class TransactionManager implements ITransactionManager, ITransactionEventGenerator{
+public class TransactionManager implements ITransactionManager, ITransactionEventGenerator, ITwoPCManager{
 	private ComparisonTable <Transaction, TransactionFrame> _htTransactionController;
 	private ArrayList<Transaction> _lstActiveTransaction;
 	private ITransactionEventListener _transactionEventListener = null;
 	private ComparisonTable<Transaction, Integer> _htTransactionCommitsReceived;
+	private ComparisonTable<TransactionID, ITwoPCController> _htTransactionTwoPCController;
 	
 	public TransactionManager(){
 		_htTransactionController = new ComparisonTable<Transaction, TransactionFrame>();
 		_lstActiveTransaction = new ArrayList<Transaction>();
 		_htTransactionCommitsReceived = new ComparisonTable<Transaction, Integer>();
+		_htTransactionTwoPCController = new ComparisonTable<TransactionID, ITwoPCController>();
 	}
 	
 	/**
@@ -275,6 +277,73 @@ public class TransactionManager implements ITransactionManager, ITransactionEven
 	private void logTransactionEvent(Transaction transaction, String message){
 		if(_transactionEventListener != null){
 			_transactionEventListener.transactionEventOccurred(new TransactionEvent(transaction, message));
+		}
+	}
+
+	@Override
+	/**
+	 * Relays the message to it's two PC controller.
+	 */
+	public void relayTwoPCMessage(TwoPCMessage twoPCMessage)
+			throws RemoteException {
+		if(_htTransactionTwoPCController.containsKey(twoPCMessage.getSenderTransactionID())){
+			ITwoPCController twoPCController = 
+				_htTransactionTwoPCController.get(twoPCMessage.getSenderTransactionID());
+			
+			twoPCController.processMessage(twoPCMessage);
+		}else{
+			// Start a participant. The reason why we know this is a participant
+			// site is that if it had been a coordinator, the controller would already
+			// have been registered when the message came in.
+			ParticipantController participantController = 
+				new ParticipantController(twoPCMessage.getSenderTransactionID(), this);
+			
+			participantController.setVisible(true);
+			participantController.processMessage(twoPCMessage);
+		}
+	}
+
+	@Override
+	/**
+	 * Registers a TwoPCController for a transaction.
+	 */
+	public void registerControllerForTransaction(TransactionID transactionID, ITwoPCController twoPCController) {
+		_htTransactionTwoPCController.put(transactionID, twoPCController);
+	}
+
+	@Override
+	public void simulateCommitForPeer(TransactionID transactionID, int peerID)
+			throws RemoteException {
+		// Lookup the transaction controller for this transaction and tell it to commit.
+		// Not giving in to the urge to pull off a hack (:D).
+		ArrayList<Transaction> lstTransaction = _htTransactionController.keys();
+		
+		for(Transaction transaction : lstTransaction){
+			if(transaction.getTransactionID().equals(transactionID)){
+				TransactionFrame transactionController = _htTransactionController.get(transaction);
+				
+				transactionController.commitPeer(peerID);
+				
+				break;
+			}
+		}
+	}
+	
+	@Override
+	public void simulateAbortForPeer(TransactionID transactionID, int peerID)
+			throws RemoteException {
+		// Lookup the transaction controller for this transaction and tell it to commit.
+		// Not giving in to the urge to pull off a hack (:D).
+		ArrayList<Transaction> lstTransaction = _htTransactionController.keys();
+		
+		for(Transaction transaction : lstTransaction){
+			if(transaction.getTransactionID().equals(transactionID)){
+				TransactionFrame transactionController = _htTransactionController.get(transaction);
+				
+				transactionController.abortPeer(peerID);
+				
+				break;
+			}
 		}
 	}
 }

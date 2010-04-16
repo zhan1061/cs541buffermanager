@@ -10,9 +10,13 @@ public interface ITransactionManager extends Remote{
 	public Transaction getTransactionState(Transaction transaction) throws RemoteException;
 	public void deleteTransaction(Transaction transaction) throws RemoteException, TransactionException;
 	public void wound(Transaction transaction) throws RemoteException;
+	public void relayTwoPCMessage(TwoPCMessage twoPCMessage) throws RemoteException;
+	public void simulateAbortForPeer(TransactionID transactionID, int peerID) throws RemoteException;
+	public void simulateCommitForPeer(TransactionID transactionID, int peerID) throws RemoteException;
 	
 	// Locally invocable methods.  
 	public void commit(Transaction transaction) throws RemoteException;
 	public void abort(Transaction transaction) throws RemoteException;
-	public void executeOperation(IOperation operation) throws RemoteException, TransactionException;	
+	public void executeOperation(IOperation operation) throws RemoteException, TransactionException;
+	
 }
