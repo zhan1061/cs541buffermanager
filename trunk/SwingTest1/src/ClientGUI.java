@@ -34,7 +34,7 @@ public class ClientGUI extends JPanel {
     JPanel parentPanel = new JPanel(new GridLayout(2,1));
     
     final JTabbedPane tab = new JTabbedPane();
-    JButton commonButton = new JButton("click");
+    final JButton commonButton = new JButton("click");
     
     
     JPanel connectPanel = new JPanel(new GridLayout(2,3));
@@ -139,6 +139,8 @@ public class ClientGUI extends JPanel {
         }
         else{
                 tab.setVisible(false);
+                commonButton.setVisible(true);                
+                
                 busy = true;
                 createAccountResponse.append("trying to create new account...\n");
                 
@@ -167,6 +169,7 @@ public class ClientGUI extends JPanel {
                                 if (flagAbandon == true)
                                 {
                                 	flagAbandon = false;
+                                	
                                 	break;	
                                 }
                                 try{
@@ -248,6 +251,7 @@ public class ClientGUI extends JPanel {
 //        }
         else{
         	tab.setVisible(false);
+        	commonButton.setVisible(true);   
         	busy = true;
         	depositResponse.append("trying to deposit:$$"+ d_amountField.getText()+ "into account:" +d_accountNoField.getText() +"\n");
         	
@@ -275,7 +279,11 @@ public class ClientGUI extends JPanel {
                                 
                                 break;
                         }
-                        
+                        if (flagAbandon == true)
+                        {
+                        	flagAbandon = false;
+                        	break;	
+                        }
                         try{
                                 Thread.sleep(500);
                         }catch(Exception interruptedException){                 
@@ -358,6 +366,7 @@ public class ClientGUI extends JPanel {
         else{
         	tab.setVisible(false);
         	busy = true;
+        	commonButton.setVisible(true);   
         	withdrawResponse.append("trying to withdraw:$$"+ w_amountField.getText()+ "from account:" +w_accountNoField.getText() +"\n");
         	
         	Registry registry;
@@ -384,7 +393,11 @@ public class ClientGUI extends JPanel {
                                 
                                 break;
                         }
-                        
+                        if (flagAbandon == true)
+                        {
+                        	flagAbandon = false;
+                        	break;	
+                        }
                         try{
                                 Thread.sleep(500);
                         }catch(Exception interruptedException){                 
@@ -455,6 +468,7 @@ public class ClientGUI extends JPanel {
         else{
         	tab.setVisible(false);
         	busy = true;
+        	commonButton.setVisible(true);   
         	balanceResponse.append("trying to query balance in account:" +bal_accountNoField.getText() +"\n");
         	
         	Registry registry;
@@ -481,7 +495,11 @@ public class ClientGUI extends JPanel {
                                 
                                 break;
                         }
-                        
+                        if (flagAbandon == true)
+                        {
+                        	flagAbandon = false;
+                        	break;	
+                        }
                         try{
                                 Thread.sleep(500);
                         }catch(Exception interruptedException){                 
@@ -567,6 +585,7 @@ public class ClientGUI extends JPanel {
         else{
         	tab.setVisible(false);
         	busy = true;
+        	commonButton.setVisible(true);   
         	transferResponse.append("trying to transfer amount: $" + t_amountField.getText() + " from account:" +t_fromaccountNoField.getText() +" to account:" +t_toaccountNoField.getText() + "\n");
         	
         	Registry registry;
@@ -598,7 +617,11 @@ public class ClientGUI extends JPanel {
                                 
                                 break;
                         }
-                        
+                        if (flagAbandon == true)
+                        {
+                        	flagAbandon = false;
+                        	break;	
+                        }
                         try{
                                 Thread.sleep(500);
                         }catch(Exception interruptedException){                 
