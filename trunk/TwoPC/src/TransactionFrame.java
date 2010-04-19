@@ -256,9 +256,10 @@ public class TransactionFrame extends JFrame implements IOperationCompletedEvent
 					try{
 						_btnNext.setEnabled(false);
 						_btnAbort.setEnabled(false);						
-						_bOperationsStarted = true;
 						
-						_transactionManager.executeOperation(operationToExecute);						
+						_transactionManager.executeOperation(operationToExecute);
+						
+						_bOperationsStarted = true;
 					}catch(TransactionException transactionException){
 						if(_bOperationsStarted){
 							// Try to abort.
