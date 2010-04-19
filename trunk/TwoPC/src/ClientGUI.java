@@ -26,11 +26,16 @@ public class ClientGUI extends JPanel {
   String hostName;
   String port;
   boolean busy = false;
+  boolean flagAbandon = false;
   private ArrayList <String> lastActionResult = new ArrayList<String>();  
   
   public ClientGUI(String[] labels, int[] widths) {
     super(new BorderLayout());
+    JPanel parentPanel = new JPanel(new GridLayout(2,1));
+    
     final JTabbedPane tab = new JTabbedPane();
+    JButton commonButton = new JButton("click");
+    
     
     JPanel connectPanel = new JPanel(new GridLayout(2,3));
     JPanel depositPanel = new JPanel(new GridLayout(2,2));
@@ -159,7 +164,11 @@ public class ClientGUI extends JPanel {
                                         
                                         break;
                                 }
-                                
+                                if (flagAbandon == true)
+                                {
+                                	flagAbandon = false;
+                                	break;	
+                                }
                                 try{
                                         Thread.sleep(500);
                                 }catch(Exception interruptedException){                 
@@ -626,8 +635,17 @@ public class ClientGUI extends JPanel {
     transferPanel.add(transferResponseScroll,BorderLayout.WEST);
     tab.addTab("Transfer $$", transferPanel);
 /////////////////////////////////////////////////////////////////////
-    
-    add(tab);
+    commonButton.addActionListener(new ActionListener() {
+        public void actionPerformed(ActionEvent e) {
+        flagAbandon = true;
+        }
+     }
+    );
+      
+    ////////////////
+    parentPanel.add(tab);
+    parentPanel.add(commonButton);
+    add(parentPanel);
   }
 
   public String getText(int i) {
