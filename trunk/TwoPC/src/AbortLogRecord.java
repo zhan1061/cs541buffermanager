@@ -4,4 +4,8 @@ public class AbortLogRecord extends LogRecord{
 		_transactionID = transactionID;
 		_recordType = ABORT_LOG;
 	}
+	
+	public String toString(){
+		return "AbortLogRecord for " + _transactionID.toString();
+	}
 }

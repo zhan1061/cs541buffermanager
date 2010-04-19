@@ -17,4 +17,12 @@ public class VoteLogRecord extends LogRecord{
 	public int getVote(){
 		return _vote;
 	}
+	
+	public ArrayList<Integer> getParticipants() {
+		return _lstParticipant;
+	}
+	
+	public String toString(){
+		return "VoteLogRecord" + "(" + ((_vote == VOTE_YES)?"YES":"NO") + ")" + " for " + _transactionID.toString();
+	}
 }

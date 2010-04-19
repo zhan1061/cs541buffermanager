@@ -7,6 +7,10 @@ import java.awt.Font;
 import java.awt.Frame;
 import java.awt.Panel;
 import java.awt.event.*;
+import java.rmi.registry.LocateRegistry;
+import java.rmi.registry.Registry;
+import java.util.Enumeration;
+import java.util.Hashtable;
 
 import javax.swing.*;
 
@@ -23,6 +27,7 @@ public class ServerFrame extends JFrame implements IUserInteractionHandler, Acti
 	JScrollPane _scpStatus = null;
 	JTextArea _txtStatus = null;
 	JButton _btnFailRecover = null;
+	JButton _btnAccountDetails = null;
 	
 	// Set default size parameters.
 	int _windowWidth = 800;
@@ -47,6 +52,7 @@ public class ServerFrame extends JFrame implements IUserInteractionHandler, Acti
 		_tfPeerPortNumber = new JTextField(10);
 		_btnAddPeer = new JButton("Add Peer");
 		_btnFailRecover = new JButton("Fail");
+		_btnAccountDetails = new JButton("Print Accounts");
 		
 		_pnlPeerDetails.add(_lblPeerName);
 		_pnlPeerDetails.add(_tfPeerName);
@@ -56,6 +62,7 @@ public class ServerFrame extends JFrame implements IUserInteractionHandler, Acti
 		_pnlPeerDetails.add(_tfPeerPortNumber);
 		_pnlPeerDetails.add(_btnAddPeer);
 		_pnlPeerDetails.add(_btnFailRecover);
+		_pnlPeerDetails.add(_btnAccountDetails);
 		
 		getContentPane().add(_pnlPeerDetails, BorderLayout.NORTH);
 		_pnlPeerDetails.setPreferredSize(new Dimension(_windowWidth, 50));
@@ -73,6 +80,7 @@ public class ServerFrame extends JFrame implements IUserInteractionHandler, Acti
 		addWindowListener(new MyWindowAdapter());
 		_btnAddPeer.addActionListener(this);
 		_btnFailRecover.addActionListener(this);
+		_btnAccountDetails.addActionListener(this);
 		
 		setVisible(true);
 	}
@@ -128,12 +136,35 @@ public class ServerFrame extends JFrame implements IUserInteractionHandler, Acti
 			_btnFailRecover.setActionCommand("Recover");
 		}else if(e.getActionCommand().equals("Recover")){
 			appendLog("Simulating site recovery");
-			// Raise a failure event.
+			
+			// Raise a failure (of type 'recovery') event.
 			FailureEventMonitor.getFailureEventMonitor().triggerFailureEvent(
 					new FailureEvent(FailureEvent.RECOVERY_EVENT));
 			
 			_btnFailRecover.setText("Fail");
 			_btnFailRecover.setActionCommand("Fail");
+		}else if(e.getActionCommand().equals("Print Accounts")){
+			int peerID = (Integer)GlobalState.get("localPeerID");
+			Peer peer;
+			
+			try {
+				peer = PeerIDKeyedMap.getPeer(peerID);
+				Registry registry = LocateRegistry.getRegistry(peer.getPeerHostname(), peer.getPeerPortNumber());
+				ITransactionManager transactionManagerRemoteObj = (ITransactionManager)registry.lookup(peer.getPeerName() + "_TransactionManager");
+				
+				Hashtable<Integer, Double> htAccountDetails = transactionManagerRemoteObj.getAccountDetails(peerID); 
+				Enumeration<Integer> enumAccountID = htAccountDetails.keys();
+				
+				appendLog("Account details:");
+				
+				while(enumAccountID.hasMoreElements()){
+					int accountID =  enumAccountID.nextElement();
+					
+					appendLog("Acc: " + accountID + " ; Balance: " + htAccountDetails.get(accountID));
+				}				
+			} catch (Exception e1) {
+				appendLog("No account information available.");
+			}			
 		}
 	}
 	

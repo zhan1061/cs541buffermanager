@@ -4,4 +4,8 @@ public class CommitLogRecord extends LogRecord {
 		_transactionID = transactionID;
 		_recordType = COMMIT_LOG;
 	}
+	
+	public String toString(){
+		return "CommitLogRecord for " + _transactionID.toString();
+	}
 }

@@ -11,6 +11,10 @@ public class StartTwoPCLogRecord extends LogRecord {
 	}
 	
 	public String toString(){
-		return "Start-2PC for TID: " + _transactionID.toString();
+		return "Start-2PC for " + _transactionID.toString();
+	}
+	
+	public ArrayList<Integer> getParticipants(){
+		return _lstParticipant;
 	}
 }

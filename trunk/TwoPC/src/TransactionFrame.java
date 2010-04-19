@@ -24,6 +24,7 @@ public class TransactionFrame extends JFrame implements IOperationCompletedEvent
 	private ArrayList<Integer> _lstTargetServerID = null;
 	private ITwoPCController _twoPCController = null;
 	private int _localPeerID = -1;
+	private boolean _bOperationsStarted = false;
 	
 	public TransactionFrame(Transaction transaction, ITransactionManager transactionManager){
 		super("Transaction - " + transaction.toString());
@@ -252,24 +253,26 @@ public class TransactionFrame extends JFrame implements IOperationCompletedEvent
 						_transaction.setTotalTargetServers(_lstTargetServerID.size());
 					}
 					
-					_btnNext.setEnabled(false);
-					_btnAbort.setEnabled(false);
-					
 					try{
 						_transactionManager.executeOperation(operationToExecute);
+						_btnNext.setEnabled(false);
+						_btnAbort.setEnabled(false);						
+						_bOperationsStarted = true;
 					}catch(TransactionException transactionException){
-						// Try to abort.
-						// We may have to generate multiple commit operations
-						// if we talked to multiple schedulers during a transaction.
-						for(Integer targetServerID : _lstTargetServerID){
-							AbortOperation abortOperation = new AbortOperation(_transaction);
-							
-							abortOperation.setTargetServerID(targetServerID);
-							
-							try{
-								_transactionManager.executeOperation(abortOperation);
-							}catch(Exception exception){
-								// Do nothing if abort fails.
+						if(_bOperationsStarted){
+							// Try to abort.
+							// We may have to generate multiple commit operations
+							// if we talked to multiple schedulers during a transaction.
+							for(Integer targetServerID : _lstTargetServerID){
+								AbortOperation abortOperation = new AbortOperation(_transaction);
+
+								abortOperation.setTargetServerID(targetServerID);
+
+								try{
+									_transactionManager.executeOperation(abortOperation);
+								}catch(Exception exception){
+									// Do nothing if abort fails.
+								}
 							}
 						}
 					}
