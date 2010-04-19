@@ -7,6 +7,10 @@ import java.awt.Font;
 import java.awt.Frame;
 import java.awt.Panel;
 import java.awt.event.*;
+import java.rmi.registry.LocateRegistry;
+import java.rmi.registry.Registry;
+import java.util.Enumeration;
+import java.util.Hashtable;
 
 import javax.swing.*;
 
@@ -22,6 +26,8 @@ public class ServerFrame extends JFrame implements IUserInteractionHandler, Acti
 	JButton _btnAddPeer = null;
 	JScrollPane _scpStatus = null;
 	JTextArea _txtStatus = null;
+	JButton _btnAccountDetails = null;
+	
 	// Set default size parameters.
 	int _windowWidth = 800;
 	int _windowHeight = 400;
@@ -44,6 +50,7 @@ public class ServerFrame extends JFrame implements IUserInteractionHandler, Acti
 		_lblPeerPortNumber = new JLabel("Peer port:");
 		_tfPeerPortNumber = new JTextField(10);
 		_btnAddPeer = new JButton("Add Peer");
+		_btnAccountDetails = new JButton("Print Accounts");
 		
 		_pnlPeerDetails.add(_lblPeerName);
 		_pnlPeerDetails.add(_tfPeerName);
@@ -52,7 +59,8 @@ public class ServerFrame extends JFrame implements IUserInteractionHandler, Acti
 		_pnlPeerDetails.add(_lblPeerPortNumber);
 		_pnlPeerDetails.add(_tfPeerPortNumber);
 		_pnlPeerDetails.add(_btnAddPeer);
-				
+		_pnlPeerDetails.add(_btnAccountDetails);
+		
 		getContentPane().add(_pnlPeerDetails, BorderLayout.NORTH);
 		_pnlPeerDetails.setPreferredSize(new Dimension(_windowWidth, 50));
 		
@@ -68,6 +76,7 @@ public class ServerFrame extends JFrame implements IUserInteractionHandler, Acti
 		// Add window listener.
 		addWindowListener(new MyWindowAdapter());
 		_btnAddPeer.addActionListener(this);
+		_btnAccountDetails.addActionListener(this);
 		
 		setVisible(true);
 	}
@@ -114,6 +123,28 @@ public class ServerFrame extends JFrame implements IUserInteractionHandler, Acti
 			_tfPeerHostName.setText("");
 			_tfPeerName.setText("");
 			_tfPeerPortNumber.setText("");
+		}else if(e.getActionCommand().equals("Print Accounts")){
+			int peerID = (Integer)GlobalState.get("localPeerID");
+			Peer peer;
+			
+			try {
+				peer = PeerIDKeyedMap.getPeer(peerID);
+				Registry registry = LocateRegistry.getRegistry(peer.getPeerHostname(), peer.getPeerPortNumber());
+				ITransactionManager transactionManagerRemoteObj = (ITransactionManager)registry.lookup(peer.getPeerName() + "_TransactionManager");
+				
+				Hashtable<Integer, Double> htAccountDetails = transactionManagerRemoteObj.getAccountDetails(peerID); 
+				Enumeration<Integer> enumAccountID = htAccountDetails.keys();
+				
+				appendLog("Account details:");
+				
+				while(enumAccountID.hasMoreElements()){
+					int accountID =  enumAccountID.nextElement();
+					
+					appendLog("Acc: " + accountID + " ; Balance: " + htAccountDetails.get(accountID));
+				}				
+			} catch (Exception e1) {
+				appendLog("No account information available.");
+			}			
 		}
 	}
 	

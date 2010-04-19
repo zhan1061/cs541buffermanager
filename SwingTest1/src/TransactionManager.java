@@ -277,4 +277,19 @@ public class TransactionManager implements ITransactionManager, ITransactionEven
 			_transactionEventListener.transactionEventOccurred(new TransactionEvent(transaction, message));
 		}
 	}
+
+	@Override
+	public Hashtable<Integer, Double> getAccountDetails(int peerID) throws RemoteException{
+		try {
+			Peer peer = PeerIDKeyedMap.getPeer(peerID);
+			Registry registry = LocateRegistry.getRegistry(peer.getPeerHostname(), peer.getPeerPortNumber());
+			IScheduler schedulerRemoteObj = (IScheduler)registry.lookup(peer.getPeerName() + "_Scheduler");
+			
+			return schedulerRemoteObj.getLocalAccountDetails();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		return null;
+	}
 }
