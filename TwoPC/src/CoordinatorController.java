@@ -25,6 +25,13 @@ import javax.swing.border.Border;
 public class CoordinatorController extends JFrame implements ITwoPCController, IFailureEventListener{
 	private static final int MAX_TRIES = 20;
 	private static final int TIMER_INTERVAL = 500;
+	private static final int TWOPC_STARTED = 0;
+	private static final int NO_VOTE_SENT = 1;
+	private static final int YES_VOTE_SENT = 1;
+	private static final int DECISION_RECEIVED = 2;
+	private static final int COMMITTED = 3;
+	private static final int ABORTED = 4;
+	private static final int VOTE_REQUESTED = 5;
 	
 	private JButton _btnVoteRequest;
 //	private JButton _btnStart2PC;
@@ -47,6 +54,8 @@ public class CoordinatorController extends JFrame implements ITwoPCController, I
 	private Hashtable<Integer, VoteReplyMessage> _htParticipantVotingReplies;
 	private TimerTask _voteReplyTimerTask;
 	private Timer _voteReplyTimer;
+	private int _transactionState;
+	private boolean _bTransactionWounded;
 	
 	/**
 	 * The controller is also registered with the TwoPCManager.
@@ -141,9 +150,23 @@ public class CoordinatorController extends JFrame implements ITwoPCController, I
 		_twoPCManager.registerControllerForTransaction(_transactionID, this);
 		_btnVoteRequest.setEnabled(true);
 		FailureEventMonitor.getFailureEventMonitor().registerFailureEventListener(this);
-		// Self-send the Start2PC message.
-//		StartTwoPCMessage startTwoPCMessage = new StartTwoPCMessage();
-//		processMessage(startTwoPCMessage);
+		_bTransactionWounded = false;
+		
+		StartTwoPCMessage startTwoPCMessage = new StartTwoPCMessage(_localPeerID, _transactionID);
+		
+		for(Integer participantID : _lstParticipant){					
+			ITransactionManager transactionManager = getTransactionManagerRemoteObj(participantID);
+			
+			try {
+				_lstVoteReplyPendingParticipants.add(participantID);
+				logTwoPCEvent("Signalling start of 2PC to " + 
+						participantID + ":" + PeerIDKeyedMap.getPeer(participantID).getPeerName());
+				transactionManager.relayTwoPCMessage(startTwoPCMessage);						
+			} catch (Exception exception) {
+				logTwoPCEvent(exception.getMessage());
+				exception.printStackTrace();
+			}
+		}
 	}
 	
 	@Override
@@ -169,6 +192,63 @@ public class CoordinatorController extends JFrame implements ITwoPCController, I
 			} catch (InvalidPeerException e) {
 				e.printStackTrace();
 			}
+			
+			break;
+		case TwoPCMessage.DECISION_REQUEST_MESSAGE:
+			DecisionRequestMessage decisionRequestMessage = (DecisionRequestMessage)twoPCMessage;
+			
+			try {
+				logTwoPCEvent("Received DECISION_REQ from " + 
+						decisionRequestMessage.getParticipantID() + ":" + 
+						PeerIDKeyedMap.getPeer(decisionRequestMessage.getParticipantID()).getPeerName());
+			} catch (InvalidPeerException e) {
+				e.printStackTrace();
+			}
+			
+			if(_transactionState == COMMITTED){
+				ITransactionManager transactionManager = getTransactionManagerRemoteObj(decisionRequestMessage.getParticipantID());
+				DecisionReplyMessage decisionReplyMessage = new DecisionReplyMessage(_localPeerID, DecisionReplyMessage.COMMIT_DECISION_REPLY, _transactionID);
+				
+				try {
+					logTwoPCEvent("Sending commit message (in reply to DECISION_REQUEST) to " + 
+							decisionRequestMessage.getParticipantID() + ":" + PeerIDKeyedMap.getPeer(decisionRequestMessage.getParticipantID()).getPeerName());
+					transactionManager.relayTwoPCMessage(decisionReplyMessage);						
+				} catch (Exception exception) {
+					logTwoPCEvent(exception.getMessage());
+					exception.printStackTrace();
+				}
+			}else if(_transactionState == ABORTED){
+				// I've aborted already. Reply with an ABORT message.
+				ITransactionManager transactionManager = getTransactionManagerRemoteObj(decisionRequestMessage.getParticipantID());
+				DecisionReplyMessage decisionReplyMessage = new DecisionReplyMessage(_localPeerID, DecisionReplyMessage.ABORT_DECISION_REPLY, _transactionID);
+				
+				try {
+					logTwoPCEvent("Sending abort message (in reply to DECISION_REQUEST) to " + 
+							decisionRequestMessage.getParticipantID() + ":" + PeerIDKeyedMap.getPeer(decisionRequestMessage.getParticipantID()).getPeerName());
+					transactionManager.relayTwoPCMessage(decisionReplyMessage);						
+				} catch (Exception exception) {
+					logTwoPCEvent(exception.getMessage());
+					exception.printStackTrace();
+				}
+			}
+			
+			break;
+		case TwoPCMessage.ABORT_RECOVER_MESSAGE:
+			// Send the ABORT message to all participants. Also, attempt to commit locally.
+			abortAll();
+			
+			// At this point, all buttons should be disabled.
+			_btnCommit.setEnabled(false);
+			_btnAbort.setEnabled(false);
+			
+			break;
+		case TwoPCMessage.WOUND_MESSAGE:
+			_bTransactionWounded = true;
+			
+			logTwoPCEvent("Transaction " + twoPCMessage.getSenderTransactionID().toString() + " wounded.");
+			
+			// Disable the commit button.
+			_btnCommit.setEnabled(false);
 			
 			break;
 		}
@@ -241,8 +321,9 @@ public class CoordinatorController extends JFrame implements ITwoPCController, I
 						transactionManager.relayTwoPCMessage(commitMessage);
 						
 						// Test. Simulate coordinator going down after sending first commit out.
-						FailureEventMonitor.getFailureEventMonitor().triggerFailureEvent(new FailureEvent(FailureEvent.FAILURE_EVENT));
-						break;
+//						FailureEventMonitor.getFailureEventMonitor().triggerFailureEvent(new FailureEvent(FailureEvent.FAILURE_EVENT));
+//						break;
+						// Test ends.
 					} catch (Exception exception) {
 						logTwoPCEvent(exception.getMessage());
 						exception.printStackTrace();
@@ -254,11 +335,13 @@ public class CoordinatorController extends JFrame implements ITwoPCController, I
 				
 				try {
 					logTwoPCEvent("Sending commit message to self.");
-					transactionManager.simulateCommitForPeer(_transactionID, _localPeerID);					
+					transactionManager.simulateCommitForPeer(_transactionID, _localPeerID);
+					
+					_transactionState = COMMITTED;					
 				} catch (Exception exception) {
 					logTwoPCEvent(exception.getMessage());
 					exception.printStackTrace();
-				}
+				}				
 				
 				// Disable the termination buttons.
 				_btnCommit.setEnabled(false);
@@ -280,12 +363,13 @@ public class CoordinatorController extends JFrame implements ITwoPCController, I
 	private void abortAll(){
 		// Send the ABORT message to all participants. Also, attempt to commit locally.
 		DTLog.getLog().add(new AbortLogRecord(_transactionID));
+		boolean bAbortFailed = false;
 		
 		for(Integer participantID : _lstParticipant){
 			// Send aborts only to those who voted YES.
 			VoteReplyMessage voteReplyMessage = _htParticipantVotingReplies.get(new Integer(participantID));
 			
-			if(voteReplyMessage != null && voteReplyMessage.getVote() == VoteReplyMessage.YES_VOTE){
+			if(voteReplyMessage == null || voteReplyMessage.getVote() == VoteReplyMessage.YES_VOTE){
 				ITransactionManager transactionManager = getTransactionManagerRemoteObj(participantID);
 				AbortMessage abortMessage = new AbortMessage(participantID, _transactionID);
 
@@ -296,6 +380,8 @@ public class CoordinatorController extends JFrame implements ITwoPCController, I
 				} catch (Exception exception) {
 					logTwoPCEvent(exception.getMessage());
 					exception.printStackTrace();
+					
+					bAbortFailed = true;
 				}
 			}
 		}
@@ -309,6 +395,12 @@ public class CoordinatorController extends JFrame implements ITwoPCController, I
 		} catch (Exception exception) {
 			logTwoPCEvent(exception.getMessage());
 			exception.printStackTrace();
+			
+			bAbortFailed = true;
+		}
+		
+		if(bAbortFailed == false){
+			_transactionState = ABORTED;
 		}
 	}
 	
@@ -334,7 +426,14 @@ public class CoordinatorController extends JFrame implements ITwoPCController, I
 								
 				// If all replies were 'Yes', enabel the Commit button
 				if(areAllParticipantVotesYes()){
-					_btnCommit.setEnabled(true);
+					if(_bTransactionWounded == true){
+						// Since the transaction has been wounded, the only
+						// option open to the coordinator should be to abort.
+						_btnCommit.setEnabled(false);
+					}else{
+						_btnCommit.setEnabled(true);
+					}
+					
 					_btnAbort.setEnabled(true);					
 				}else{
 					_btnCommit.setEnabled(false);
@@ -382,9 +481,21 @@ public class CoordinatorController extends JFrame implements ITwoPCController, I
 			_btnVoteRequest.setEnabled(false);
 			_btnVoteYesLocally.setEnabled(false);
 			
+			// Cancel the vote reply timer.
+			if(_voteReplyTimerTask != null){
+				_voteReplyTimerTask.cancel();
+			}
+			
 			logTwoPCEvent("Site failed.");
 		}else if (failureEvent.getFailureEventType() == FailureEvent.RECOVERY_EVENT){
-			logTwoPCEvent("Site recovered.");
+			DTRecoveryManager dtRecoveryManager = new DTRecoveryManager();
+			
+			try{
+				dtRecoveryManager.recoverTransaction(_transactionID);
+				logTwoPCEvent("Site recovered.");
+			}catch(Exception exception){
+				logTwoPCEvent(exception.getMessage());
+			}
 		}
 	}
 	

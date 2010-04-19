@@ -31,6 +31,10 @@ public class Scheduler implements IScheduler, ISchedulerEventGenerator {
 	
 	@Override
 	public void schedule(IOperation operation) throws RemoteException, TransactionException {
+		if(FailureEventMonitor.getFailureEventMonitor().getCurrentFailureState() == FailureEvent.FAILURE_EVENT){
+			throw new TransactionException("Simulated failure.");
+		}
+		
 		if(_lstUnqueriedTransaction.contains(operation.getParentTransaction()) == false){
 			_lstUnqueriedTransaction.add(operation.getParentTransaction());
 		}
@@ -707,5 +711,11 @@ public class Scheduler implements IScheduler, ISchedulerEventGenerator {
 	public void setSchedulerEventListener(
 			ISchedulerEventListener schedulerEventListener) {
 		_schedulerEventListener = schedulerEventListener;
+	}
+
+	@Override
+	public Hashtable<Integer, Double> getLocalAccountDetails()
+			throws RemoteException {
+		return _dataManager.getAccountDetails();		
 	}
 }

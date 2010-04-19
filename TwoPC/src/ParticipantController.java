@@ -22,6 +22,7 @@ import javax.swing.JTextArea;
 public class ParticipantController extends JFrame implements ITwoPCController, IFailureEventListener{
 	private final int VOTE_REQUEST_TRIES = 20;
 	private static final int TIMER_INTERVAL = 500;
+	private static final int CTP_MESSAGE_INTERVAL = 1000;
 	// Transaction states.
 	private static final int TWOPC_STARTED = 0;
 	private static final int NO_VOTE_SENT = 1;
@@ -50,8 +51,12 @@ public class ParticipantController extends JFrame implements ITwoPCController, I
 	private int _voteRequestWaitTries; // Each try is executed after 500 ms.
 	private Timer _decisionWaitTimer;
 	private TimerTask _decisionWaitTimerTask;
+	private Timer _ctpTimer;
+	private TimerTask _ctpTimerTask;
 	private int _transactionState;
 	private int _voteCast = VoteReplyMessage.INVALID_VOTE;
+	private ArrayList<DecisionReplyMessage> _lstDecisionReplyMessage;
+	private boolean _bTransactionWounded;
 	
 	/**
 	 * The controller is also registered with the TwoPCManager.
@@ -115,6 +120,7 @@ public class ParticipantController extends JFrame implements ITwoPCController, I
 		}
 		
 		_lstParticipant = new ArrayList<Integer>();
+		_lstDecisionReplyMessage = new ArrayList<DecisionReplyMessage>();
 		
 		initialize();
 	}
@@ -145,12 +151,20 @@ public class ParticipantController extends JFrame implements ITwoPCController, I
 	/**
 	 * Processes a message based on its type.
 	 */
-	public void processMessage(TwoPCMessage twoPCMessage) {
+	public void processMessage(TwoPCMessage twoPCMessage) {		
 		switch(twoPCMessage.getMessageType()){
+		case TwoPCMessage.STARTTWOPC_MESSAGE:
+			// Get the coordinator ID out of this message.
+			StartTwoPCMessage startTwoPCMessage = (StartTwoPCMessage)twoPCMessage;
+			_coordinatorID = startTwoPCMessage.getCoordinatorID();
+			
+			logTwoPCEvent("2PC started.");
+			
+			break;
 		case TwoPCMessage.VOTE_REQUEST_MESSAGE:
 			// This message signals the start of 2PC for the participant.
 			VoteRequestMessage voteRequestMessage = (VoteRequestMessage)twoPCMessage;
-			_coordinatorID = voteRequestMessage.getCoordinatorID();
+//			_coordinatorID = voteRequestMessage.getCoordinatorID();
 			_lstParticipant = voteRequestMessage.getParticipants();			
 			// Set variable indicating the vote-request has been received.
 			_bVoteRequestReceived = true;
@@ -164,7 +178,12 @@ public class ParticipantController extends JFrame implements ITwoPCController, I
 			}
 			
 			// Enable the vote buttons.
-			_btnVoteYes.setEnabled(true);
+			if(_bTransactionWounded == true){
+				_btnVoteYes.setEnabled(false);
+			}else{
+				_btnVoteYes.setEnabled(true);
+			}
+			
 			_btnVoteNo.setEnabled(true);
 			
 			break;
@@ -174,9 +193,18 @@ public class ParticipantController extends JFrame implements ITwoPCController, I
 			if(_transactionState != DECISION_RECEIVED && _transactionState != COMMITTED && _transactionState != ABORTED){
 				_transactionState = DECISION_RECEIVED;
 				logTwoPCEvent("Received COMMIT from coordinator.");
+				
 				// Cancel the decision wait timer.
 				// We can only commit if the 'Commit' button is clicked.
-				_decisionWaitTimerTask.cancel();
+				if(_decisionWaitTimerTask != null){
+					_decisionWaitTimerTask.cancel();
+				}
+				
+				if(_ctpTimerTask != null){
+					_ctpTimerTask.cancel();
+					_ctpTimerTask = null;
+				}
+				
 				// The log to commit won't be written until the 'Commit' button
 				// is pressed.
 				_btnCommit.setEnabled(true);
@@ -189,8 +217,41 @@ public class ParticipantController extends JFrame implements ITwoPCController, I
 			if(_transactionState != DECISION_RECEIVED && _transactionState != COMMITTED && _transactionState != ABORTED){
 				_transactionState = DECISION_RECEIVED;
 				logTwoPCEvent("Received ABORT from coordinator.");
+				
 				// Cancel the decision wait timer.
-				_decisionWaitTimerTask.cancel();
+				if(_decisionWaitTimerTask != null){
+					_decisionWaitTimerTask.cancel();
+				}
+				
+				// Cancel the CTP timer if it is running.
+				if(_ctpTimerTask != null){
+					_ctpTimerTask.cancel();
+					_ctpTimerTask = null;
+				}
+				
+				// We can abort here without further user-input.			
+				DTLog.getLog().add(new AbortLogRecord(_transactionID));
+				logTwoPCEvent("Aborting.");
+				abort();			
+			}
+			
+			break;
+		case TwoPCMessage.ABORT_RECOVER_MESSAGE:
+			// This check ensures that if we receive multiple COMMIT/ABORT messages (as part of CTP, for instance),
+			// we only process them once.
+			if(_transactionState != DECISION_RECEIVED && _transactionState != COMMITTED && _transactionState != ABORTED){
+				_transactionState = DECISION_RECEIVED;
+				logTwoPCEvent("Received ABORT from recovery manager.");
+				// Cancel the decision wait timer.
+				if(_decisionWaitTimerTask != null){
+					_decisionWaitTimerTask.cancel();
+				}
+				
+				if(_ctpTimerTask != null){
+					_ctpTimerTask.cancel();
+					_ctpTimerTask = null;
+				}
+				
 				// We can abort here without further user-input.			
 				DTLog.getLog().add(new AbortLogRecord(_transactionID));
 				logTwoPCEvent("Aborting.");
@@ -213,12 +274,12 @@ public class ParticipantController extends JFrame implements ITwoPCController, I
 				// I haven't voted yes yet or I've aborted already. Reply with
 				// an ABORT message.
 				ITransactionManager transactionManager = getTransactionManagerRemoteObj(decisionRequestMessage.getParticipantID());
-				AbortMessage abortMessage = new AbortMessage(decisionRequestMessage.getParticipantID(), _transactionID);
-
+				DecisionReplyMessage decisionReplyMessage = new DecisionReplyMessage(_localPeerID, DecisionReplyMessage.ABORT_DECISION_REPLY, _transactionID);
+				
 				try {
 					logTwoPCEvent("Sending abort message (in reply to DECISION_REQUEST) to " + 
 							decisionRequestMessage.getParticipantID() + ":" + PeerIDKeyedMap.getPeer(decisionRequestMessage.getParticipantID()).getPeerName());
-					transactionManager.relayTwoPCMessage(abortMessage);						
+					transactionManager.relayTwoPCMessage(decisionReplyMessage);						
 				} catch (Exception exception) {
 					logTwoPCEvent(exception.getMessage());
 					exception.printStackTrace();
@@ -226,12 +287,12 @@ public class ParticipantController extends JFrame implements ITwoPCController, I
 			}else if(_transactionState == COMMITTED){
 				//  I've committed by now. You can too.
 				ITransactionManager transactionManager = getTransactionManagerRemoteObj(decisionRequestMessage.getParticipantID());
-				CommitMessage abortMessage = new CommitMessage(decisionRequestMessage.getParticipantID(), _transactionID);
-
+				DecisionReplyMessage decisionReplyMessage = new DecisionReplyMessage(_localPeerID, DecisionReplyMessage.COMMIT_DECISION_REPLY, _transactionID);
+				
 				try {
 					logTwoPCEvent("Sending commit message (in reply to DECISION_REQUEST) to " + 
 							decisionRequestMessage.getParticipantID() + ":" + PeerIDKeyedMap.getPeer(decisionRequestMessage.getParticipantID()).getPeerName());
-					transactionManager.relayTwoPCMessage(abortMessage);						
+					transactionManager.relayTwoPCMessage(decisionReplyMessage);						
 				} catch (Exception exception) {
 					logTwoPCEvent(exception.getMessage());
 					exception.printStackTrace();
@@ -241,6 +302,72 @@ public class ParticipantController extends JFrame implements ITwoPCController, I
 			}
 			
 			break;
+		case TwoPCMessage.DECISION_REPLY_MESSAGE:
+			if(_transactionState != COMMITTED && _transactionState != ABORTED){
+				// Essentially, we only process the first decision reply message.
+				DecisionReplyMessage decisionReplyMessage = (DecisionReplyMessage)twoPCMessage;
+
+				try {
+					logTwoPCEvent("Decision reply message received from " + decisionReplyMessage.getSenderID() + ":" + 
+							PeerIDKeyedMap.getPeer(decisionReplyMessage.getSenderID()).getPeerName());
+				} catch (InvalidPeerException e) {					
+				}				
+
+				// We can cancel the CTP timer since we've received a decision reply.
+				if(_ctpTimerTask != null){
+					_ctpTimerTask.cancel();
+					_ctpTimerTask = null;
+				}
+				
+				synchronized(_lstDecisionReplyMessage){
+					if(_lstDecisionReplyMessage.isEmpty()){
+						_lstDecisionReplyMessage.add(decisionReplyMessage);
+
+						// Decide what to do based on the decision type.
+						switch(decisionReplyMessage.getDecisionReplyType()){
+						case DecisionReplyMessage.COMMIT_DECISION_REPLY:
+							DTLog.getLog().add(new CommitLogRecord(_transactionID));
+							logTwoPCEvent("Wrote commit to log.");
+							commit();
+							_btnCommit.setEnabled(false);
+							_btnAbort.setEnabled(false);
+							
+							break;
+						case DecisionReplyMessage.ABORT_DECISION_REPLY:
+							DTLog.getLog().add(new AbortLogRecord(_transactionID));
+							logTwoPCEvent("Aborting.");
+							abort();
+							_btnCommit.setEnabled(false);
+							_btnAbort.setEnabled(false);
+
+							break;
+						}
+					}
+				}
+			}
+			
+			break;
+		case TwoPCMessage.START_CTP_MESSAGE:
+			// Start the CTP task
+			if(_ctpTimerTask != null){
+				_ctpTimerTask.cancel();
+			}
+			
+			_ctpTimer = new Timer();
+			_ctpTimerTask = new CTPTimerTask();
+			_ctpTimer.schedule(_ctpTimerTask, new Date(System.currentTimeMillis()), TIMER_INTERVAL);
+			
+			break;
+		case TwoPCMessage.WOUND_MESSAGE:
+			_bTransactionWounded = true;
+			
+			logTwoPCEvent("Transaction " + twoPCMessage.getSenderTransactionID().toString() + " wounded.");
+			
+			// Disable the commit and vote yes buttons.
+			_btnVoteYes.setEnabled(false);
+			_btnCommit.setEnabled(false);
+			
+			break;		
 		}
 	}
 	
@@ -276,6 +403,40 @@ public class ParticipantController extends JFrame implements ITwoPCController, I
 		_txtStatus.append(log + "\n");
 	}
 	
+	/**
+	 * Initiates the Cooperative Termination Protocol.
+	 */
+	private void startCTP(){
+		logTwoPCEvent("Initiating Cooperative Termination Protocol.");
+		
+		// Send decision request messages to all participants.
+		for(Integer participantID : _lstParticipant){
+			if(participantID != _localPeerID){
+				ITransactionManager transactionManager = getTransactionManagerRemoteObj(participantID);
+				DecisionRequestMessage decisionRequestMessage = new DecisionRequestMessage(_localPeerID, _transactionID);
+
+				try {
+					logTwoPCEvent("Sending decision request message to " + 
+							participantID + ":" + PeerIDKeyedMap.getPeer(participantID).getPeerName());
+					transactionManager.relayTwoPCMessage(decisionRequestMessage);						
+				} catch (Exception exception) {
+					// Any participants who're down aren't expected to reply anyway.
+				}
+			}
+		}
+		
+		// Send decision request to the coordinator as well.
+		DecisionRequestMessage decisionRequestMessage = new DecisionRequestMessage(_localPeerID, _transactionID);
+		
+		try {
+			logTwoPCEvent("Sending decision request message to " + 
+					_coordinatorID + ":" + PeerIDKeyedMap.getPeer(_coordinatorID).getPeerName());
+			getTransactionManagerRemoteObj(_coordinatorID).relayTwoPCMessage(decisionRequestMessage);						
+		} catch (Exception exception) {
+			// Any participants who're dow aren't expected to reply anyway.
+		}
+	}
+	
 	class ControllerButtonEventHandler implements ActionListener{
 
 		@Override
@@ -291,16 +452,12 @@ public class ParticipantController extends JFrame implements ITwoPCController, I
 				
 				// Send the 'YES' vote.
 				try{
-					transactionManager.relayTwoPCMessage(voteReplyMessage);
-					logTwoPCEvent("Sent yes vote to coordinator.");
-					
 					_transactionState = YES_VOTE_SENT;
 					_voteCast = VoteReplyMessage.YES_VOTE;
 					
 					// Get the decision wait timer going.
 					_decisionWaitTimerTask = new DecisionWaitTimerTask(VOTE_REQUEST_TRIES);
 					_decisionWaitTimer = new Timer();
-					
 					_decisionWaitTimer.schedule(_decisionWaitTimerTask, new Date(System.currentTimeMillis()), TIMER_INTERVAL);
 					
 					// Disable the 'Abort' button since we've voted yes.
@@ -308,6 +465,9 @@ public class ParticipantController extends JFrame implements ITwoPCController, I
 					// Disabe the voting buttons.
 					_btnVoteYes.setEnabled(false);
 					_btnVoteNo.setEnabled(false);
+					
+					transactionManager.relayTwoPCMessage(voteReplyMessage);
+					logTwoPCEvent("Sent yes vote to coordinator.");
 				}catch(Exception exception){
 					logTwoPCEvent("Error sending vote - " + exception.getMessage());
 					exception.printStackTrace();
@@ -324,10 +484,6 @@ public class ParticipantController extends JFrame implements ITwoPCController, I
 				
 				// Send the 'NO' vote.
 				try{
-					transactionManager.relayTwoPCMessage(voteReplyMessage);
-					logTwoPCEvent("Sent no vote to coordinator.");
-					
-					_transactionState = NO_VOTE_SENT;
 					_voteCast = VoteReplyMessage.NO_VOTE;
 					
 					// Disable all buttons.
@@ -335,6 +491,9 @@ public class ParticipantController extends JFrame implements ITwoPCController, I
 					_btnVoteNo.setEnabled(false);
 					_btnCommit.setEnabled(false);
 					_btnAbort.setEnabled(false);
+					
+					transactionManager.relayTwoPCMessage(voteReplyMessage);
+					logTwoPCEvent("Sent no vote to coordinator.");
 				}catch(Exception exception){
 					logTwoPCEvent("Error sending vote - " + exception.getMessage());
 					exception.printStackTrace();
@@ -361,16 +520,32 @@ public class ParticipantController extends JFrame implements ITwoPCController, I
 			
 			if(_maxTries == 0){
 				logTwoPCEvent("Decision wait timeout expired.");
+				cancel();
 				
-				this.cancel();
+				// Start the CTP task
+				if(_ctpTimerTask != null){
+					_ctpTimerTask.cancel();
+				}
 				
-				// TODO: Initiate CTP.
-				logTwoPCEvent("Initiating Cooperative Termination Protocol.");
+				_ctpTimer = new Timer();
+				_ctpTimerTask = new CTPTimerTask();
+				_ctpTimer.schedule(_ctpTimerTask, new Date(System.currentTimeMillis()), CTP_MESSAGE_INTERVAL);
 			}
 				
 			_maxTries--;			
 		}		
 	}// DecisionWaitTimerTask ends.
+	
+	class CTPTimerTask extends TimerTask{
+		public CTPTimerTask(){
+		
+		}
+		
+		@Override
+		public void run() {
+			startCTP();					
+		}		
+	}// CTPTimerTask ends.
 
 	@Override
 	public void failureEventOccurred(FailureEvent failureEvent) {
@@ -381,9 +556,21 @@ public class ParticipantController extends JFrame implements ITwoPCController, I
 			_btnVoteNo.setEnabled(false);
 			_btnVoteYes.setEnabled(false);
 
+			// Shut down the decision timer.
+			if(_decisionWaitTimerTask != null){
+				_decisionWaitTimerTask.cancel();
+			}
+			
 			logTwoPCEvent("Site failed.");
 		}else if (failureEvent.getFailureEventType() == FailureEvent.RECOVERY_EVENT){
-			logTwoPCEvent("Site recovered.");
+			DTRecoveryManager dtRecoveryManager = new DTRecoveryManager();
+			
+			try{
+				dtRecoveryManager.recoverTransaction(_transactionID);
+				logTwoPCEvent("Site recovered.");
+			}catch(Exception exception){
+				logTwoPCEvent(exception.getMessage());
+			}			
 		}
 	}
 }

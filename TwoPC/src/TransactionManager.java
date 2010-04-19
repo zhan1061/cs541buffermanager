@@ -103,32 +103,41 @@ public class TransactionManager implements ITransactionManager, ITransactionEven
 		// Find the transaction in our active transaction list.
 		// If it is not found, it means that has already completed. So
 		// do nothing.
-		// It it is, and its status is 'completed', then again, do nothing.
+		// If it is, and its status is 'completed', then again, do nothing.
 		for(Transaction activeTransaction : _lstActiveTransaction){
 			if(activeTransaction.equals(transaction)){
 				// Found transaction. Let's check the completion status.
 				if(activeTransaction.isComplete() == false){
-					// We can wound this transaction. Get the corresponding controller.
-					TransactionFrame transactionController = _htTransactionController.get(activeTransaction);
-					
-					transactionController.abort();
-					// Close this controller and begin the transaction anew.
-					transactionController.setVisible(false);
-					activeTransaction.setTotalTargetServers(0);
-					
-					if(_htTransactionCommitsReceived.containsKey(activeTransaction)){
-						// Reset the number of aborts received. This needs to be done
-						// because a transaction with the same ID (in fact, the same transaction),
-						// was just aborted.
-						_htTransactionCommitsReceived.put(activeTransaction, 0);
+					if(_htTransactionTwoPCController.containsKey(transaction.getTransactionID())){
+						// There exists a twoPC controller (coordinator or participant)
+						// that's handling the transaction. Send a wound message to it.
+						WoundMessage woundMessage = new WoundMessage(transaction.getTransactionID());
+						
+						relayTwoPCMessage(woundMessage);
+					}else{
+						// This transaction hasn't reached the 2PC stage yet.
+						// We can wound this transaction. Get the corresponding controller.
+						TransactionFrame transactionController = _htTransactionController.get(activeTransaction);
+
+						transactionController.abort();
+						// Close this controller and begin the transaction anew.
+						transactionController.setVisible(false);
+						activeTransaction.setTotalTargetServers(0);
+
+						if(_htTransactionCommitsReceived.containsKey(activeTransaction)){
+							// Reset the number of aborts received. This needs to be done
+							// because a transaction with the same ID (in fact, the same transaction),
+							// was just aborted.
+							_htTransactionCommitsReceived.put(activeTransaction, 0);
+						}
+
+						// Create a copy of the active transaction.
+						Transaction newTransaction = new Transaction(activeTransaction.getOriginatingServerID(), 
+								activeTransaction.getAction());
+						newTransaction.setTransactionID(activeTransaction.getTransactionID());					
+
+						begin(newTransaction);
 					}
-					
-					// Create a copy of the active transaction.
-					Transaction newTransaction = new Transaction(activeTransaction.getOriginatingServerID(), 
-							activeTransaction.getAction());
-					newTransaction.setTransactionID(activeTransaction.getTransactionID());					
-					
-					begin(newTransaction);
 				}
 			}
 		}
@@ -190,6 +199,20 @@ public class TransactionManager implements ITransactionManager, ITransactionEven
 		}
 	}
 
+	public Hashtable<Integer, Double> getAccountDetails(int peerID) throws RemoteException{
+		try {
+			Peer peer = PeerIDKeyedMap.getPeer(peerID);
+			Registry registry = LocateRegistry.getRegistry(peer.getPeerHostname(), peer.getPeerPortNumber());
+			IScheduler schedulerRemoteObj = (IScheduler)registry.lookup(peer.getPeerName() + "_Scheduler");
+			
+			return schedulerRemoteObj.getLocalAccountDetails();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		return null;
+	}
+	
 	/**
 	 * The operation argument will have the result (if any) of the operation. This
 	 * method will be invoked by the scheduler. For this reason, mind the reference.
@@ -286,6 +309,11 @@ public class TransactionManager implements ITransactionManager, ITransactionEven
 	 */
 	public void relayTwoPCMessage(TwoPCMessage twoPCMessage)
 			throws RemoteException {
+		// If this site has 'failed', throw a RemoteException.
+		if(FailureEventMonitor.getFailureEventMonitor().getCurrentFailureState() == FailureEvent.FAILURE_EVENT){
+			throw new RemoteException("Simulated failure.");
+		}
+		
 		if(_htTransactionTwoPCController.containsKey(twoPCMessage.getSenderTransactionID())){
 			ITwoPCController twoPCController = 
 				_htTransactionTwoPCController.get(twoPCMessage.getSenderTransactionID());
