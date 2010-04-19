@@ -708,4 +708,10 @@ public class Scheduler implements IScheduler, ISchedulerEventGenerator {
 			ISchedulerEventListener schedulerEventListener) {
 		_schedulerEventListener = schedulerEventListener;
 	}
+
+	@Override
+	public Hashtable<Integer, Double> getLocalAccountDetails()
+			throws RemoteException {
+		return _dataManager.getAccountDetails();
+	}
 }

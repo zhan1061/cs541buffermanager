@@ -138,4 +138,7 @@ public class DataManager {
 		
 	}
 	
+	public Hashtable<Integer, Double> getAccountDetails(){
+		return account;
+	}	
 }

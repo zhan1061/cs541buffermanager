@@ -1,5 +1,6 @@
 import java.rmi.Remote;
 import java.rmi.RemoteException;
+import java.util.Hashtable;
 
 public interface ITransactionManager extends Remote{
 	// Remotely invocable methods.
@@ -14,5 +15,6 @@ public interface ITransactionManager extends Remote{
 	// Locally invocable methods.  
 	public void commit(Transaction transaction) throws RemoteException;
 	public void abort(Transaction transaction) throws RemoteException;
-	public void executeOperation(IOperation operation) throws RemoteException, TransactionException;	
+	public void executeOperation(IOperation operation) throws RemoteException, TransactionException;
+	public Hashtable<Integer, Double> getAccountDetails(int peerID) throws RemoteException;
 }
